@@ -89,13 +89,13 @@ int32_t DoppelgangerTagArray::lookup(const Address lineAddr, const MemReq* req, 
     for (uint32_t id = first; id < first + assoc; id++) {
         if (tagArray[id] ==  lineAddr) {
             if (updateReplacement) rp->update(id, req);
-            return mapPointerArray[id];
+            return id;
         }
     }
     return -1;
 }
 
-uint32_t DoppelgangerTagArray::preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr) {
+int32_t DoppelgangerTagArray::preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr) {
     uint32_t set = hf->hash(0, lineAddr) & setMask;
     uint32_t first = set*assoc;
 
@@ -105,80 +105,61 @@ uint32_t DoppelgangerTagArray::preinsert(const Address lineAddr, const MemReq* r
     return candidate;
 }
 
-void DoppelgangerTagArray::postinsert(const Address lineAddr, const MemReq* req, uint32_t candidate, uint32_t map, int32_t listHead, bool* deleted, int32_t* oldListHead, int32_t* mapID) {
-    rp->replaced(candidate);
-    tagArray[candidate] = lineAddr;
-    *mapID = mapPointerArray[candidate];
-    mapPointerArray[candidate] = map;
-    // info("\tINSIDE1: %i", mapPointerArray[candidate]);
-    if (prevPointerArray[candidate] != -1) {
-        *deleted = false;
-        nextPointerArray[prevPointerArray[candidate]] = nextPointerArray[candidate];
-    } else {
-        *oldListHead = nextPointerArray[candidate];
-    }
-    if (nextPointerArray[candidate] != -1) {
-        *deleted = false;
-        prevPointerArray[nextPointerArray[candidate]] = prevPointerArray[candidate];
-    }
-    prevPointerArray[candidate] = -1;
-    nextPointerArray[candidate] = listHead;
+bool DoppelgangerTagArray::evictAssociatedData(const int32_t lineId, int32_t* newLLHead) {
+    *newLLHead = -1;
+    if (mapPointerArray[lineId] == -1)
+        return false;
+    if (prevPointerArray[lineId] != -1)
+        return false;
+    else
+        *newLLHead = nextPointerArray[lineId];
+    if (nextPointerArray[lineId] != -1)
+        return false;
+    return true;
+}
+
+void DoppelgangerTagArray::postinsert(const Address lineAddr, const MemReq* req, const int32_t tagId, const int32_t mapId, const int32_t listHead, const bool updateReplacement) {
+    rp->replaced(tagId);
+    tagArray[tagId] = lineAddr;
+    mapPointerArray[tagId] = mapId;
+    if (prevPointerArray[tagId] != -1)
+        nextPointerArray[prevPointerArray[tagId]] = nextPointerArray[tagId];
+    if (nextPointerArray[tagId] != -1)
+        prevPointerArray[nextPointerArray[tagId]] = prevPointerArray[tagId];
+    prevPointerArray[tagId] = -1;
+    nextPointerArray[tagId] = listHead;
     if (listHead >= 0) {
-        if(prevPointerArray[listHead] == -1) prevPointerArray[listHead] = candidate;
+        if(prevPointerArray[listHead] == -1) prevPointerArray[listHead] = tagId;
         else panic("List head is not actually a list head!");
     }
-    rp->update(candidate, req);
+    if(updateReplacement) rp->update(mapId, req);
 }
 
-int32_t DoppelgangerTagArray::walkLinkedList(const uint32_t start) {
-    return nextPointerArray[start];
+int32_t DoppelgangerTagArray::readMapId(const int32_t tagId) {
+    return mapPointerArray[tagId];
 }
 
-Address DoppelgangerTagArray::read(const uint32_t id) {
-    return tagArray[id];
+Address DoppelgangerTagArray::readAddress(const int32_t tagId) {
+    return tagArray[tagId];
 }
 
-uint32_t DoppelgangerTagArray::changeLinkedList(const Address lineAddr, const int32_t listHead, const uint32_t map, bool* deleted, int32_t* oldListHead) {
-    uint32_t set = hf->hash(0, lineAddr) & setMask;
-    uint32_t first = set*assoc;
-    *deleted = true;
-    for (uint32_t id = first; id < first + assoc; id++) {
-        if (tagArray[id] ==  lineAddr) {
-            if (prevPointerArray[id] != -1) {
-                *deleted = false;
-                nextPointerArray[prevPointerArray[id]] = nextPointerArray[id];
-            } else {
-                *oldListHead = nextPointerArray[id];
-            }
-            if (nextPointerArray[id] != -1) {
-                *deleted = false;
-                prevPointerArray[nextPointerArray[id]] = prevPointerArray[id];
-            }
-            prevPointerArray[id] = -1;
-            nextPointerArray[id] = listHead;
-            if (listHead == -1) {
-                mapPointerArray[id] = map;
-            } else {
-                mapPointerArray[id] = mapPointerArray[listHead];
-            }
-            return id;
-        }
-    }
-    panic("A tag must hit here!");
+int32_t DoppelgangerTagArray::readNextLL(const int32_t tagId) {
+    return nextPointerArray[tagId];
 }
 
 void DoppelgangerTagArray::print() {
     for (uint32_t i = 0; i < this->numLines; i++) {
         if (mapPointerArray[i] != -1)
-            info("%i: %lu, %i, %i, %i", i, tagArray[i], prevPointerArray[i], nextPointerArray[i], mapPointerArray[i]);
+            info("%i: %lu, %i, %i, %i", i, tagArray[i] << lineBits, prevPointerArray[i], nextPointerArray[i], mapPointerArray[i]);
     }
 }
 
 DoppelgangerDataArray::DoppelgangerDataArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf) : rp(_rp), hf(_hf), numLines(_numLines), assoc(_assoc)  {
-    mtagArray = gm_calloc<Address>(numLines);
+    mtagArray = gm_calloc<int32_t>(numLines);
     tagPointerArray = gm_calloc<int32_t>(numLines);
     for (uint32_t i = 0; i < numLines; i++) {
         tagPointerArray[i] = -1;
+        mtagArray[i] = -1;
     }
     numSets = numLines/assoc;
     setMask = numSets - 1;
@@ -189,13 +170,12 @@ int32_t DoppelgangerDataArray::lookup(const uint32_t map, const MemReq* req, boo
     uint32_t set = hf->hash(0, map) & setMask;
     uint32_t first = set*assoc;
     for (uint32_t id = first; id < first + assoc; id++) {
-        if (mtagArray[id] ==  map) {
+        if (mtagArray[id] ==  (int32_t)map) {
             if (updateReplacement) rp->update(id, req);
             return id;
         }
     }
-    panic("Doppelganger must find a match in the MTag Array");
-    return -1;    // Make GCC Happy
+    return -1;
 }
 
 uint32_t DoppelgangerDataArray::calculateMap(const DataLine data, const DataType type, const DataValue minValue, const DataValue maxValue) {
@@ -386,19 +366,14 @@ uint32_t DoppelgangerDataArray::calculateMap(const DataLine data, const DataType
                     floatMin = ((float*) data)[i];
             }
             floatAvgHash = floatSum/(zinfo->lineSize/sizeof(float));
-            // info("Hash1: %f", floatAvgHash);
             floatRangeHash = floatMax - floatMin;
-            // info("Hash2: %f", floatRangeHash);
             if (floatMax > maxValue.FLOAT)
-                panic("Received a value bigger than the annotation's Max!!");
+                panic("Received a value bigger than the annotation's Max!! %f, %f", floatMax, maxValue.FLOAT);
             if (floatMin < minValue.FLOAT)
-                panic("Received a value lower than the annotation's Min!!");
+                panic("Received a value lower than the annotation's Min!! %f, %f", floatMax, maxValue.FLOAT);
             mapStep = (maxValue.FLOAT - minValue.FLOAT)/std::pow(2,zinfo->mapSize-1);
-            // info("MapStep: %f", mapStep);
             avgMap = floatAvgHash/mapStep;
-            // info("Map1: %i", avgMap);
             rangeMap = floatRangeHash/mapStep;
-            // info("Map2: %i", rangeMap);
             break;
         case ZSIM_DOUBLE:
             for (uint32_t i = 0; i < zinfo->lineSize/sizeof(double); i++) {
@@ -421,70 +396,41 @@ uint32_t DoppelgangerDataArray::calculateMap(const DataLine data, const DataType
         default:
             panic("Wrong Data Type!!");
     }
-    map = avgMap;
-    map |= (rangeMap >> (zinfo->lineSize/2)) << zinfo->lineSize;
+    map = ((uint32_t)avgMap << (32 - zinfo->mapSize)) >> (32 - zinfo->mapSize);
+    rangeMap = ((uint32_t)rangeMap << (32 - zinfo->mapSize)) >> (32 - zinfo->mapSize);
+    map |= (rangeMap >> (zinfo->mapSize/2)) << zinfo->mapSize;
     return map;
 }
 
-int32_t DoppelgangerDataArray::findSimilarLine(const uint32_t map) {
-    uint32_t set = hf->hash(0, map) & setMask;
-    uint32_t first = set*assoc;
-    for (uint32_t id = first; id < first + assoc; id++) {
-        if (mtagArray[id] ==  map) {
-            return tagPointerArray[id];
-        }
-    }
-    return -1;
-}
-
-void DoppelgangerDataArray::changeTag(const uint32_t map, const uint32_t tag, const MemReq* req, bool updateReplacement) {
-    uint32_t set = hf->hash(0, map) & setMask;
-    uint32_t first = set*assoc;
-    for (uint32_t id = first; id < first + assoc; id++) {
-        if (mtagArray[id] ==  map) {
-            rp->update(id, req);
-            tagPointerArray[id] = tag;
-            return;
-        }
-    }
-    panic("Doppelganger must find a match in the MTag Array");
-}
-
-uint32_t DoppelgangerDataArray::preinsert(const uint32_t map, const MemReq* req, int32_t* tag) {
+int32_t DoppelgangerDataArray::preinsert(const uint32_t map, const MemReq* req, int32_t* tagId) {
     uint32_t set = hf->hash(0, map) & setMask;
     uint32_t first = set*assoc;
 
-    uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc));
+    uint32_t mapId = rp->rankCands(req, SetAssocCands(first, first+assoc));
 
-    *tag = tagPointerArray[candidate];
-    return candidate;
+    *tagId = tagPointerArray[mapId];
+    return mapId;
 }
 
-void DoppelgangerDataArray::postinsert(const uint32_t map, const MemReq* req, uint32_t candidate, uint32_t listHead) {
-    rp->replaced(candidate);
-    mtagArray[candidate] = map;
-    tagPointerArray[candidate] = listHead;
-    rp->update(candidate, req);
+void DoppelgangerDataArray::postinsert(const uint32_t map, const MemReq* req, int32_t mapId, int32_t tagId, bool updateReplacement) {
+    rp->replaced(mapId);
+    mtagArray[mapId] = map;
+    tagPointerArray[mapId] = tagId;
+    if(updateReplacement) rp->update(mapId, req);
 }
 
-void DoppelgangerDataArray::clear(const uint32_t map) {
-    uint32_t set = hf->hash(0, map) & setMask;
-    uint32_t first = set*assoc;
-    for (uint32_t id = first; id < first + assoc; id++) {
-        if (mtagArray[id] ==  map) {
-            rp->replaced(id);
-            mtagArray[id] = 0;
-            tagPointerArray[id] = -1;
-            return;
-        }
-    }
-    // panic("Doppelganger must find a match in the MTag Array");
+int32_t DoppelgangerDataArray::readListHead(const int32_t mapId) {
+    return tagPointerArray[mapId];
+}
+
+int32_t DoppelgangerDataArray::readMap(const int32_t mapId) {
+    return mtagArray[mapId];
 }
 
 void DoppelgangerDataArray::print() {
     for (uint32_t i = 0; i < this->numLines; i++) {
         if (tagPointerArray[i] != -1)
-            info("%i: %lu, %i", i, mtagArray[i], tagPointerArray[i]);
+            info("%i: %u, %i", i, mtagArray[i], tagPointerArray[i]);
     }
 }
 // Doppelganger End

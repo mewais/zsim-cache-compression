@@ -239,7 +239,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
     ReplPolicy* tmpRP = nullptr;
     if (arrayType == "Doppelganger") {
         tagRP = new LRUReplPolicy<true>(numLines/2);
-        dataRP = new LRUReplPolicy<true>(numLines/8);
+        dataRP = new DataLRUReplPolicy(numLines/8);
         tagArray = new DoppelgangerTagArray(numLines/2, ways, tagRP, hf);
         dataArray = new DoppelgangerDataArray(numLines/8, ways, dataRP, hf);
         tmpRP = new LRUReplPolicy<true>(numLines/2);

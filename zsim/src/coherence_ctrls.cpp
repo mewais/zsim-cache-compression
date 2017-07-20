@@ -225,7 +225,6 @@ uint64_t MESITopCC::sendInvalidates(Address lineAddr, uint32_t lineId, InvType t
         uint32_t sentInvs = 0;
         for (uint32_t c = 0; c < numChildren; c++) {
             if (e->sharers[c]) {
-                info("lineId %u", lineId);
                 InvReq req = {lineAddr, type, reqWriteback, cycle, srcId};
                 uint64_t respCycle = children[c]->invalidate(req);
                 respCycle += childrenRTTs[c];
@@ -265,7 +264,6 @@ uint64_t MESITopCC::processAccess(Address lineAddr, uint32_t lineId, AccessType 
     uint64_t respCycle = cycle;
     switch (type) {
         case PUTX:
-            info("lineId %u", lineId);
             assert(e->isExclusive());
             if (flags & MemReq::PUTX_KEEPEXCL) {
                 assert(e->sharers[childId]);

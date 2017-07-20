@@ -137,9 +137,58 @@ class LRUReplPolicy : public ReplPolicy {
             // (1) valid (if not valid, it's 0)
             // (2) sharers, and
             // (3) timestamp
-            if (cc == NULL)
-                return timestamp + array[id];
             return (sharersAware? cc->numSharers(id) : 0)*timestamp + array[id]*cc->isValid(id);
+        }
+};
+
+class DataLRUReplPolicy : public ReplPolicy {
+    protected:
+        uint64_t timestamp; // incremented on each access
+        uint64_t* array;
+        bool* valid;
+        uint32_t numLines;
+
+    public:
+        explicit DataLRUReplPolicy(uint32_t _numLines) : timestamp(1), numLines(_numLines) {
+            array = gm_calloc<uint64_t>(numLines);
+            valid = gm_calloc<bool>(numLines);
+        }
+
+        ~DataLRUReplPolicy() {
+            gm_free(array);
+            gm_free(valid);
+        }
+
+        void update(uint32_t id, const MemReq* req) {
+            array[id] = timestamp++;
+            valid[id] = true;
+        }
+
+        void replaced(uint32_t id) {
+            array[id] = 0;
+            valid[id] = false;
+        }
+
+        template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+            uint32_t bestCand = -1;
+            uint64_t bestScore = (uint64_t)-1L;
+            for (auto ci = cands.begin(); ci != cands.end(); ci.inc()) {
+                uint32_t s = score(*ci);
+                bestCand = (s < bestScore)? *ci : bestCand;
+                bestScore = MIN(s, bestScore);
+            }
+            return bestCand;
+        }
+
+        DECL_RANK_BINDINGS;
+
+    private:
+        inline uint64_t score(uint32_t id) { //higher is least evictable
+            //array[id] < timestamp always, so this prioritizes by:
+            // (1) valid (if not valid, it's 0)
+            // (2) sharers, and
+            // (3) timestamp
+            return array[id]*valid[id];
         }
 };
 
