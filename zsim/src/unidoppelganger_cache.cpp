@@ -1,49 +1,42 @@
-#include "doppelganger_cache.h"
-#include "event_recorder.h"
-#include "timing_event.h"
-#include <cstring>
+#include "unidoppelganger_cache.h"
 #include "pin.H"
 
-DoppelgangerCache::DoppelgangerCache(uint32_t _numLines, CC* _cc, CC* _dcc, DoppelgangerTagArray* _tagArray, DoppelgangerDataArray* _dataArray, 
-CacheArray* _array, ReplPolicy* tagRP, ReplPolicy* dataRP, ReplPolicy* RP, uint32_t _accLat, uint32_t _invLat, 
-uint32_t mshrs, uint32_t tagLat, uint32_t mtagLat, uint32_t mapLat, uint32_t dataLat, uint32_t ways, uint32_t cands,
-uint32_t _domain, const g_string& _name) : TimingCache(_numLines, _cc, _array, RP, _accLat, _invLat, mshrs, tagLat, 
-ways, cands, _domain, _name), dcc(_dcc), tagArray(_tagArray), dataArray(_dataArray), tagLat(tagLat), mtagLat(mtagLat), 
-mapLat(mapLat), dataLat(dataLat), tagRP(tagRP), dataRP(dataRP) {
-    // info("Doppelganger Created");
+#include <cstdlib>
+#include <time.h>
+
+uniDoppelgangerCache::uniDoppelgangerCache(uint32_t _numLines, CC* _cc, uniDoppelgangerTagArray* _tagArray, 
+uniDoppelgangerDataArray* _dataArray, CacheArray* _array, ReplPolicy* tagRP, ReplPolicy* dataRP, uint32_t _accLat, uint32_t _invLat, 
+uint32_t mshrs, uint32_t tagLat, uint32_t mtagLat, uint32_t mapLat, uint32_t dataLat, uint32_t ways, uint32_t cands, 
+uint32_t _domain, const g_string& _name) : TimingCache(_numLines, _cc, _array, tagRP, _accLat, _invLat, mshrs, tagLat, 
+ways, cands, _domain, _name), tagArray(_tagArray), dataArray(_dataArray), tagLat(tagLat), mtagLat(mtagLat), 
+mapLat(mapLat), dataLat(dataLat), tagRP(tagRP), dataRP(dataRP) {}
+
+void uniDoppelgangerCache::initCacheStats(AggregateStat* cacheStat) {
+    cc->initStats(cacheStat);
+    tagArray->initStats(cacheStat);
+    dataArray->initStats(cacheStat);
+    tagRP->initStats(cacheStat);
+    dataRP->initStats(cacheStat);
 }
 
-void DoppelgangerCache::setParents(uint32_t childId, const g_vector<MemObject*>& parents, Network* network) {
-    dcc->setParents(childId, parents, network);
-    TimingCache::setParents(childId, parents, network);
-}
-
-void DoppelgangerCache::setChildren(const g_vector<BaseCache*>& children, Network* network) {
-    dcc->setChildren(children, network);
-    TimingCache::setChildren(children, network);
-}
-
-uint64_t DoppelgangerCache::access(MemReq& req) {
+uint64_t uniDoppelgangerCache::access(MemReq& req) {
     // // info("%lu: REQ %s to address %lu.", req.cycle, AccessTypeName(req.type), req.lineAddr);
     DataLine data = gm_calloc<uint8_t>(zinfo->lineSize);
-    DataType type;
+    DataType type = ZSIM_FLOAT;
     DataValue min, max;
-    bool Found = false;
+    bool approximate = false;
     for(uint32_t i = 0; i < zinfo->approximateRegions.size(); i++) {
         if ((req.lineAddr << lineBits) > std::get<0>(zinfo->approximateRegions[i]) && (req.lineAddr << lineBits) < std::get<1>(zinfo->approximateRegions[i])) {
             type = std::get<2>(zinfo->approximateRegions[i]);
             min = std::get<3>(zinfo->approximateRegions[i]);
             max = std::get<4>(zinfo->approximateRegions[i]);
-            Found = true;
+            approximate = true;
             break;
         }
     }
-    if (!Found) {
-        // // info("%lu: REQ %s to address %lu confirmed exact.", req.cycle, AccessTypeName(req.type), req.lineAddr << lineBits);
-        return TimingCache::access(req);
-    }
-    PIN_SafeCopy(data, (void*)(req.lineAddr << lineBits), zinfo->lineSize);
-
+    if (approximate)
+        PIN_SafeCopy(data, (void*)(req.lineAddr << lineBits), zinfo->lineSize);
+    
     EventRecorder* evRec = zinfo->eventRecorders[req.srcId];
     assert_msg(evRec, "DoppelgangerCache is not connected to TimingCore");
 
@@ -56,7 +49,8 @@ uint64_t DoppelgangerCache::access(MemReq& req) {
 
     uint64_t respCycle = req.cycle;
     bool Hit;
-    bool skipAccess = dcc->startAccess(req); //may need to skip access due to races (NOTE: may change req.type!)
+    bool skipAccess = cc->startAccess(req); //may need to skip access due to races (NOTE: may change req.type!)
+
     if (likely(!skipAccess)) {
         // info("%lu: REQ %s to address %lu confirmed approximate.", req.cycle, AccessTypeName(req.type), req.lineAddr << lineBits);
         bool updateReplacement = (req.type == GETS) || (req.type == GETX);
@@ -64,60 +58,114 @@ uint64_t DoppelgangerCache::access(MemReq& req) {
         respCycle += accLat;
 
         if (tagId == -1) {
-            // Miss, no tags found.
             Hit = false;
-            assert(dcc->shouldAllocate(req));
-            
-            uint32_t map = dataArray->calculateMap(data, type, min, max);
+            assert(cc->shouldAllocate(req));
 
-            // // info("\tMiss Req data type: %s, data: %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", DataTypeName(type), ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3], ((float*)data)[4], ((float*)data)[5], ((float*)data)[6], ((float*)data)[7], ((float*)data)[8], ((float*)data)[9], ((float*)data)[10], ((float*)data)[11], ((float*)data)[12], ((float*)data)[13], ((float*)data)[14], ((float*)data)[15]);
-            // info("\tMiss Req map: %u", map);
-            int32_t mapId = dataArray->lookup(map, &req, updateReplacement);
-            if (mapId != -1) {
-                // info("\tSimilar map at: %i", mapId);
-                // Found similar mtag, allocate new tag and evict another if necessary.
-                Address wbLineAddr;
-                int32_t victimTagId = tagArray->preinsert(req.lineAddr, &req, &wbLineAddr); //find the lineId to replace
-                tagId = victimTagId;
-                trace(Cache, "[%s] Evicting 0x%lx", name.c_str(), wbLineAddr);
+            if (approximate) {
+                // If this is approximate, do like Doppelganger
+                uint32_t map = dataArray->calculateMap(data, type, min, max);
 
-                // info("\t\tEvicting tagId: %i", victimTagId);
-                evDoneCycle = dcc->processEviction(req, wbLineAddr, victimTagId, respCycle); //if needed, send invalidates/downgrades to lower level, and wb to upper level
+                // // info("\tMiss Req data type: %s, data: %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", DataTypeName(type), ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3], ((float*)data)[4], ((float*)data)[5], ((float*)data)[6], ((float*)data)[7], ((float*)data)[8], ((float*)data)[9], ((float*)data)[10], ((float*)data)[11], ((float*)data)[12], ((float*)data)[13], ((float*)data)[14], ((float*)data)[15]);
+                // info("\tApproximate Miss Req map: %u", map);
+                int32_t mapId = dataArray->lookup(map, &req, updateReplacement);
+                if (mapId != -1) {
+                    // info("\tSimilar map at: %i", mapId);
+                    // Found similar mtag, allocate new tag and evict another if necessary.
+                    Address wbLineAddr;
+                    int32_t victimTagId = tagArray->preinsert(req.lineAddr, &req, &wbLineAddr); //find the lineId to replace
+                    tagId = victimTagId;
+                    trace(Cache, "[%s] Evicting 0x%lx", name.c_str(), wbLineAddr);
+                    // info("\t\tEvicting tagId: %i", victimTagId);
+                    evDoneCycle = cc->processEviction(req, wbLineAddr, victimTagId, respCycle);
 
-                int32_t newLLHead;
-                bool evictDataLine = tagArray->evictAssociatedData(victimTagId, &newLLHead);
-                int32_t victimDataId = tagArray->readMapId(victimTagId);
-                if (evictDataLine) {
-                    // info("\t\tAlong with dataId: %i", victimDataId);
-                    // Clear (Evict, Tags already evicted) data line
-                    dataArray->postinsert(0, &req, victimDataId, -1, false);
-                } else if (newLLHead != -1) {
-                    // Change Tag
-                    uint32_t victimMap = dataArray->readMap(victimDataId);
-                    dataArray->postinsert(victimMap, &req, victimDataId, newLLHead, false);
-                }
-                int32_t oldListHead = dataArray->readListHead(mapId);
-                tagArray->postinsert(req.lineAddr, &req, victimTagId, mapId, oldListHead, updateReplacement);
-                dataArray->postinsert(map, &req, mapId, victimTagId, updateReplacement);
-                
-                if (evRec->hasRecord()) {
-                    writebackRecord.clear();
-                    writebackRecord = evRec->popRecord();
-                    writebackRecords.push_back(writebackRecord);
+                    int32_t newLLHead;
+                    bool approximateVictim;
+                    bool evictDataLine = tagArray->evictAssociatedData(victimTagId, &newLLHead, &approximateVictim);
+                    int32_t victimDataId = tagArray->readMapId(victimTagId);
+                    if (evictDataLine) {
+                        // This will evect the data line, whether exact or approximate
+                        // info("\t\tAlong with dataId: %i", victimDataId);
+                        // Clear (Evict, Tags already evicted) data line
+                        dataArray->postinsert(-1, &req, victimDataId, -1, false, false);
+                    } else if (newLLHead != -1) {
+                        // Change Tag
+                        uint32_t victimMap = dataArray->readMap(victimDataId);
+                        dataArray->postinsert(victimMap, &req, victimDataId, newLLHead, approximateVictim, false);
+                    }
+                    int32_t oldListHead = dataArray->readListHead(mapId);
+                    tagArray->postinsert(req.lineAddr, &req, victimTagId, mapId, oldListHead, true, updateReplacement);
+                    dataArray->postinsert(map, &req, mapId, victimTagId, true, updateReplacement);
+                    
+                    if (evRec->hasRecord()) {
+                        writebackRecord.clear();
+                        writebackRecord = evRec->popRecord();
+                        writebackRecords.push_back(writebackRecord);
+                    }
+                } else {
+                    // info("\tNo similar map");
+                    // couldn't find a similar mtag, allocate new data/mtag and evict another
+                    // if necessary, evict the tags associated with it too.
+                    int32_t victimListHeadId;
+                    int32_t victimDataId = dataArray->preinsert(map, &req, &victimListHeadId);
+                    evDoneCycle = respCycle;
+
+                    while (victimListHeadId != -1) {
+                        Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                        // info("\t\tEvicting tagId: %i", victimListHeadId);
+                        evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evDoneCycle);
+                        tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
+                        victimListHeadId = tagArray->readNextLL(victimListHeadId);
+                        if (evRec->hasRecord()) {
+                            writebackRecord.clear();
+                            writebackRecord = evRec->popRecord();
+                            writebackRecords.push_back(writebackRecord);
+                        }
+                    }
+
+                    Address wbLineAddr;
+                    int32_t victimTagId = tagArray->preinsert(req.lineAddr, &req, &wbLineAddr); //find the lineId to replace
+                    tagId = victimTagId;
+                    trace(Cache, "[%s] Evicting 0x%lx", name.c_str(), wbLineAddr);
+
+                    // info("\t\tEvicting tagId: %i", victimTagId);
+                    evDoneCycle = cc->processEviction(req, wbLineAddr, victimTagId, evDoneCycle); //if needed, send invalidates/downgrades to lower level, and wb to upper level
+                    
+                    int32_t newLLHead;
+                    bool approximateVictim;
+                    bool evictDataLine = tagArray->evictAssociatedData(victimTagId, &newLLHead, &approximateVictim);
+                    int32_t victimDataId2 = tagArray->readMapId(victimTagId);
+                    if (evictDataLine) {
+                        // info("\t\tAlong with dataId: %i", victimDataId2);
+                        // Clear (Evict, Tags already evicted) data line
+                        dataArray->postinsert(0, &req, victimDataId2, -1, false, false);
+                    } else if (newLLHead != -1) {
+                        // Change Tag
+                        uint32_t victimMap = dataArray->readMap(victimDataId2);
+                        dataArray->postinsert(victimMap, &req, victimDataId2, newLLHead, approximateVictim, false);
+                    }
+                    tagArray->postinsert(req.lineAddr, &req, victimTagId, victimDataId, -1, true, updateReplacement);
+                    dataArray->postinsert(map, &req, victimDataId, victimTagId, true, updateReplacement);
+
+                    if (evRec->hasRecord()) {
+                        writebackRecord.clear();
+                        writebackRecord = evRec->popRecord();
+                        writebackRecords.push_back(writebackRecord);
+                    }
                 }
             } else {
-                // info("\tNo similar map");
-                // couldn't find a similar mtag, allocate new data/mtag and evict another
-                // if necessary, evict the tags associated with it too.
+                // info("\tExact Miss Req");
+                // Exact line, free a data line and a tag for it.
+                srand (time(NULL));
                 int32_t victimListHeadId;
+                uint32_t map = rand() % (uint32_t)std::pow(2, zinfo->mapSize-1);
                 int32_t victimDataId = dataArray->preinsert(map, &req, &victimListHeadId);
                 evDoneCycle = respCycle;
 
                 while (victimListHeadId != -1) {
                     Address wbLineAddr = tagArray->readAddress(victimListHeadId);
                     // info("\t\tEvicting tagId: %i", victimListHeadId);
-                    evDoneCycle = dcc->processEviction(req, wbLineAddr, victimListHeadId, evDoneCycle);
-                    tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false);
+                    evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evDoneCycle);
+                    tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
                     victimListHeadId = tagArray->readNextLL(victimListHeadId);
                     if (evRec->hasRecord()) {
                         writebackRecord.clear();
@@ -132,22 +180,23 @@ uint64_t DoppelgangerCache::access(MemReq& req) {
                 trace(Cache, "[%s] Evicting 0x%lx", name.c_str(), wbLineAddr);
 
                 // info("\t\tEvicting tagId: %i", victimTagId);
-                evDoneCycle = dcc->processEviction(req, wbLineAddr, victimTagId, evDoneCycle); //if needed, send invalidates/downgrades to lower level, and wb to upper level
+                evDoneCycle = cc->processEviction(req, wbLineAddr, victimTagId, evDoneCycle); //if needed, send invalidates/downgrades to lower level, and wb to upper level
                 
                 int32_t newLLHead;
-                bool evictDataLine = tagArray->evictAssociatedData(victimTagId, &newLLHead);
+                bool approximateVictim;
+                bool evictDataLine = tagArray->evictAssociatedData(victimTagId, &newLLHead, &approximateVictim);
                 int32_t victimDataId2 = tagArray->readMapId(victimTagId);
                 if (evictDataLine) {
                     // info("\t\tAlong with dataId: %i", victimDataId2);
                     // Clear (Evict, Tags already evicted) data line
-                    dataArray->postinsert(0, &req, victimDataId2, -1, false);
+                    dataArray->postinsert(0, &req, victimDataId2, -1, false, false);
                 } else if (newLLHead != -1) {
                     // Change Tag
                     uint32_t victimMap = dataArray->readMap(victimDataId2);
-                    dataArray->postinsert(victimMap, &req, victimDataId2, newLLHead, false);
+                    dataArray->postinsert(victimMap, &req, victimDataId2, newLLHead, approximateVictim, false);
                 }
-                tagArray->postinsert(req.lineAddr, &req, victimTagId, victimDataId, -1, updateReplacement);
-                dataArray->postinsert(map, &req, victimDataId, victimTagId, updateReplacement);
+                tagArray->postinsert(req.lineAddr, &req, victimTagId, victimDataId, -1, false, updateReplacement);
+                dataArray->postinsert(-1, &req, victimDataId, victimTagId, false, updateReplacement);
 
                 if (evRec->hasRecord()) {
                     writebackRecord.clear();
@@ -158,11 +207,11 @@ uint64_t DoppelgangerCache::access(MemReq& req) {
         } else {
             // This is a hit
             Hit = true;
-            if (req.type == PUTX) {
+            if (approximate && req.type == PUTX) {
                 // If this is a write
                 uint32_t map = dataArray->calculateMap(data, type, min, max);
                 // // info("\tHit Req data type: %s, data: %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", DataTypeName(type), ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3], ((float*)data)[4], ((float*)data)[5], ((float*)data)[6], ((float*)data)[7], ((float*)data)[8], ((float*)data)[9], ((float*)data)[10], ((float*)data)[11], ((float*)data)[12], ((float*)data)[13], ((float*)data)[14], ((float*)data)[15]);
-                // info("\tHit PUTX Req map: %u, tagId = %i", map, tagId);
+                // info("\tApproximate Hit PUTX Req map: %u, tagId = %i", map, tagId);
                 // respCycle += mapLat;
                 uint32_t previousMap = dataArray->readMap(tagArray->readMapId(tagId));
 
@@ -180,20 +229,21 @@ uint64_t DoppelgangerCache::access(MemReq& req) {
                         // we only need to add the tag to the existing linked
                         // list.
                         int32_t newLLHead;
-                        bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead);
+                        bool approximateVictim;
+                        bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead, &approximateVictim);
                         int32_t victimDataId = tagArray->readMapId(tagId);
                         if (evictDataLine) {
                             // info("\t\tEvicting dataId %i previously associated with tagId %i", victimDataId, tagId);
                             // Clear (Evict, Tags already evicted) data line
-                            dataArray->postinsert(0, &req, victimDataId, -1, false);
+                            dataArray->postinsert(0, &req, victimDataId, -1, false, false);
                         } else if (newLLHead != -1) {
                             // Change Tag
                             uint32_t victimMap = dataArray->readMap(victimDataId);
-                            dataArray->postinsert(victimMap, &req, victimDataId, newLLHead, false);
+                            dataArray->postinsert(victimMap, &req, victimDataId, newLLHead, approximateVictim, false);
                         }
                         int32_t oldListHead = dataArray->readListHead(mapId);
-                        tagArray->postinsert(req.lineAddr, &req, tagId, mapId, oldListHead, false);
-                        dataArray->postinsert(map, &req, mapId, tagId, false);
+                        tagArray->postinsert(req.lineAddr, &req, tagId, mapId, oldListHead, true, false);
+                        dataArray->postinsert(map, &req, mapId, tagId, true, false);
                         // respCycle += MAX(mtagLat, dataLat);
                     } else {
                         // info("\tNo similar map");
@@ -208,8 +258,8 @@ uint64_t DoppelgangerCache::access(MemReq& req) {
                             if (victimListHeadId != tagId) {
                                 Address wbLineAddr = tagArray->readAddress(victimListHeadId);
                                 // info("\t\tEvicting tagId %i associated with victim dataId %i", victimListHeadId, victimDataId);
-                                evDoneCycle = dcc->processEviction(req, wbLineAddr, victimListHeadId, evDoneCycle);
-                                tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false);
+                                evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evDoneCycle);
+                                tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
                             }
                             victimListHeadId = tagArray->readNextLL(victimListHeadId);
                             if (evRec->hasRecord()) {
@@ -220,32 +270,33 @@ uint64_t DoppelgangerCache::access(MemReq& req) {
                         }
 
                         int32_t newLLHead;
-                        bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead);
+                        bool approximateVictim;
+                        bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead, &approximateVictim);
                         int32_t victimDataId2 = tagArray->readMapId(tagId);
                         if (evictDataLine) {
                             // info("\t\tEvicting dataId %i previously associated with tagId %i", victimDataId2, tagId);
                             // Clear (Evict, Tags already evicted) data line
-                            dataArray->postinsert(0, &req, victimDataId2, -1, false);
+                            dataArray->postinsert(0, &req, victimDataId2, -1, false, false);
                         } else if (newLLHead != -1) {
                             // Change Tag
                             uint32_t victimMap = dataArray->readMap(victimDataId2);
-                            dataArray->postinsert(victimMap, &req, victimDataId2, newLLHead, false);
+                            dataArray->postinsert(victimMap, &req, victimDataId2, newLLHead, approximateVictim, false);
                         }
-                        tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, -1, false);
-                        dataArray->postinsert(map, &req, victimDataId, tagId, false);
+                        tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, -1, true, false);
+                        dataArray->postinsert(map, &req, victimDataId, tagId, true, false);
                         // respCycle += mtagLat;
                     }
                 }
             } else {
                 // info("\tHit Req");
-                dataArray->lookup(tagArray->readMapId(tagId), &req, updateReplacement);
+                dataArray->lookup(tagArray->readDataId(tagId), &req, updateReplacement);
                 // respCycle += mtagLat + dataLat;
             }
         }
         gm_free(data);
 
         uint64_t getDoneCycle = respCycle;
-        respCycle = dcc->processAccess(req, tagId, respCycle, &getDoneCycle);
+        respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
 
         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
 
@@ -360,51 +411,9 @@ uint64_t DoppelgangerCache::access(MemReq& req) {
         // dataArray->print();
     }
 
-    dcc->endAccess(req);
+    cc->endAccess(req);
 
     assert_msg(respCycle >= req.cycle, "[%s] resp < req? 0x%lx type %s childState %s, respCycle %ld reqCycle %ld",
             name.c_str(), req.lineAddr, AccessTypeName(req.type), MESIStateName(*req.state), respCycle, req.cycle);
-    return respCycle;
-}
-
-void DoppelgangerCache::initCacheStats(AggregateStat* cacheStat) {
-    tagArray->initStats(cacheStat);
-    dataArray->initStats(cacheStat);
-    tagRP->initStats(cacheStat);
-    dataRP->initStats(cacheStat);
-    dcc->initStats(cacheStat);
-    TimingCache::initCacheStats(cacheStat);
-}
-
-uint64_t DoppelgangerCache::invalidate(const InvReq& req) {
-    bool Found = false;
-    for(uint32_t i = 0; i < zinfo->approximateRegions.size(); i++) {
-        if ((req.lineAddr << lineBits) > std::get<0>(zinfo->approximateRegions[i]) && (req.lineAddr << lineBits) < std::get<1>(zinfo->approximateRegions[i])) {
-            Found = true;
-            break;
-        }
-    }
-    if (Found) {
-        // info("%lu: INV to approximate address %lu.", req.cycle, req.lineAddr << lineBits);
-        startInvalidate(req);
-        return finishInvalidate(req);
-    } else {
-        TimingCache::startInvalidate();
-        return TimingCache::finishInvalidate(req);
-    }
-}
-
-void DoppelgangerCache::startInvalidate(const InvReq& req) {
-    dcc->startInv(); //note we don't grab tcc; tcc serializes multiple up accesses, down accesses don't see it
-}
-
-uint64_t DoppelgangerCache::finishInvalidate(const InvReq& req) {
-    int32_t lineId = array->lookup(req.lineAddr, nullptr, false);
-    assert_msg(lineId != -1, "[%s] Invalidate on non-existing address 0x%lx type %s lineId %d, reqWriteback %d", name.c_str(), req.lineAddr, InvTypeName(req.type), lineId, *req.writeback);
-    uint64_t respCycle = req.cycle + invLat;
-    trace(Cache, "[%s] Invalidate start 0x%lx type %s lineId %d, reqWriteback %d", name.c_str(), req.lineAddr, InvTypeName(req.type), lineId, *req.writeback);
-    respCycle = dcc->processInv(req, lineId, respCycle); //send invalidates or downgrades to children, and adjust our own state
-    trace(Cache, "[%s] Invalidate end 0x%lx type %s lineId %d, reqWriteback %d, latency %ld", name.c_str(), req.lineAddr, InvTypeName(req.type), lineId, *req.writeback, respCycle - req.cycle);
-
     return respCycle;
 }

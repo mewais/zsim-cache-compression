@@ -12,3 +12,7 @@ void zsim_heartbeat_() {
     zsim_heartbeat();
 }
 
+void zsim_mallocs_init_() {
+    // zsim_mallocs_init();
+    // TODO:
+}

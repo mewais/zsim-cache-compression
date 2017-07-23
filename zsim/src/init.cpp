@@ -42,6 +42,7 @@
 #include "ddr_mem.h"
 #include "debug_zsim.h"
 #include "doppelganger_cache.h"
+#include "unidoppelganger_cache.h"
 #include "dramsim_mem_ctrl.h"
 #include "event_queue.h"
 #include "filter_cache.h"
@@ -105,7 +106,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
     uint32_t candidates = (arrayType == "Z")? config.get<uint32_t>(prefix + "array.candidates", 16) : ways;
 
     //Need to know number of hash functions before instantiating array
-    if (arrayType == "SetAssoc" || arrayType == "Doppelganger") {
+    if (arrayType == "SetAssoc" || arrayType == "Doppelganger" || arrayType == "uniDoppelganger") {
         numHashes = 1;
     } else if (arrayType == "Z") {
         numHashes = ways;
@@ -234,6 +235,8 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
     CacheArray* array = nullptr;
     DoppelgangerTagArray* tagArray = nullptr;
     DoppelgangerDataArray* dataArray = nullptr;
+    uniDoppelgangerTagArray* utagArray = nullptr;
+    uniDoppelgangerDataArray* udataArray = nullptr;
     ReplPolicy* tagRP = nullptr;
     ReplPolicy* dataRP = nullptr;
     ReplPolicy* tmpRP = nullptr;
@@ -244,6 +247,13 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
         dataArray = new DoppelgangerDataArray(numLines/8, ways, dataRP, hf);
         tmpRP = new LRUReplPolicy<true>(numLines/2);
         array = new SetAssocArray(numLines/2, ways, tmpRP, hf);
+    } else if (arrayType == "uniDoppelganger") {
+        tagRP = new LRUReplPolicy<true>(numLines);
+        dataRP = new DataLRUReplPolicy(numLines/2);
+        utagArray = new uniDoppelgangerTagArray(numLines, ways, tagRP, hf);
+        udataArray = new uniDoppelgangerDataArray(numLines/2, ways, dataRP, hf);
+        // tmpRP = new LRUReplPolicy<true>(numLines/2);
+        array = new SetAssocArray();
     } else if (arrayType == "SetAssoc") {
         array = new SetAssocArray(numLines, ways, rp, hf);
     } else if (arrayType == "Z") {
@@ -298,6 +308,18 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             tmpRP->setCC(cc);
             
             cache = new DoppelgangerCache(numLines, cc, dcc, tagArray, dataArray, array, tagRP, dataRP, tmpRP, 
+                accLat, invLat, mshrs, tagLat, mtagLat, mapLat, dataLat, ways, timingCandidates, domain, 
+                name);
+        } else if (type == "uniDoppelganger") {
+            uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
+            uint32_t tagLat = config.get<uint32_t>(prefix + "tagLat", 5);
+            uint32_t mtagLat = config.get<uint32_t>(prefix + "mtagLat", 2);
+            uint32_t mapLat = config.get<uint32_t>(prefix + "mapLat", 2);
+            uint32_t dataLat = config.get<uint32_t>(prefix + "dataLat", 2);
+            uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
+            tagRP->setCC(cc);
+            
+            cache = new uniDoppelgangerCache(numLines, cc, utagArray, udataArray, array, tagRP, dataRP,
                 accLat, invLat, mshrs, tagLat, mtagLat, mapLat, dataLat, ways, timingCandidates, domain, 
                 name);
         } else if (type == "Timing") {

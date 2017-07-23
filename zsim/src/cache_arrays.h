@@ -67,6 +67,7 @@ class SetAssocArray : public CacheArray {
 
     public:
         SetAssocArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
+        SetAssocArray() {};
 
         int32_t lookup(const Address lineAddr, const MemReq* req, bool updateReplacement);
         uint32_t preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr);
@@ -89,21 +90,22 @@ class DoppelgangerTagArray {
 
     public:
         DoppelgangerTagArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
+        ~DoppelgangerTagArray();
         // Returns the Index of the matching tag, or -1 if none found.
-        int32_t lookup(const Address lineAddr, const MemReq* req, bool updateReplacement);
+        int32_t lookup(Address lineAddr, const MemReq* req, bool updateReplacement);
         // Returns candidate Index for insertion, wbLineAddr will point to its address for eviction.
-        int32_t preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr);
+        int32_t preinsert(Address lineAddr, const MemReq* req, Address* wbLineAddr);
         // returns a true if we should evict the associated map/data line. newLLHead is the Index of the new 
         // LinkedList Head to pointed to from the data array.
-        bool evictAssociatedData(const int32_t lineId, int32_t* newLLHead);
+        bool evictAssociatedData(int32_t lineId, int32_t* newLLHead);
         // Actually inserts
-        void postinsert(const Address lineAddr, const MemReq* req, const int32_t tagId, const int32_t mapId, const int32_t listHead, const bool updateReplacement);
+        void postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t mapId, int32_t listHead, bool updateReplacement);
         // returns mapId
-        int32_t readMapId(const int32_t tagId);
+        int32_t readMapId(int32_t tagId);
         // returns address
-        Address readAddress(const int32_t tagId);
+        Address readAddress(int32_t tagId);
         // returns next tagID in LL
-        int32_t readNextLL(const int32_t tagId);
+        int32_t readNextLL(int32_t tagId);
         void initStats(AggregateStat* parent) {}
         void print();
 };
@@ -121,22 +123,94 @@ class DoppelgangerDataArray {
 
     public:
         DoppelgangerDataArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
+        ~DoppelgangerDataArray();
         // Returns the Index of the matching map, Must find.
-        int32_t lookup(const uint32_t map, const MemReq* req, bool updateReplacement);
+        int32_t lookup(uint32_t map, const MemReq* req, bool updateReplacement);
         // Return the map of this data line
-        uint32_t calculateMap(const DataLine data, const DataType type, const DataValue minValue, const DataValue maxValue);
+        uint32_t calculateMap(const DataLine data, DataType type, DataValue minValue, DataValue maxValue);
         // Returns candidate ID for insertion, tagID will point to a tag list head that need to be evicted.
-        int32_t preinsert(const uint32_t map, const MemReq* req, int32_t* tagId);
+        int32_t preinsert(uint32_t map, const MemReq* req, int32_t* tagId);
         // Actually inserts
-        void postinsert(const uint32_t map, const MemReq* req, int32_t mapId, int32_t tagId, bool updateReplacement);
+        void postinsert(uint32_t map, const MemReq* req, int32_t mapId, int32_t tagId, bool updateReplacement);
         // returns tagId
-        int32_t readListHead(const int32_t mapId);
+        int32_t readListHead(int32_t mapId);
         // returns map
-        int32_t readMap(const int32_t mapId);
+        int32_t readMap(int32_t mapId);
         void initStats(AggregateStat* parent) {}
         void print();
 };
 // Doppelganger End
+
+// uniDoppelganger Start
+class uniDoppelgangerTagArray {
+    protected:
+        bool* approximate;
+        Address* tagArray;
+        int32_t* prevPointerArray;
+        int32_t* nextPointerArray;
+        int32_t* mapPointerArray; // Or directly data array.
+        ReplPolicy* rp;
+        HashFamily* hf;
+        uint32_t numLines;
+        uint32_t numSets;
+        uint32_t assoc;
+        uint32_t setMask;
+
+    public:
+        uniDoppelgangerTagArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
+        ~uniDoppelgangerTagArray();
+        // Returns the Index of the matching tag, or -1 if none found.
+        int32_t lookup(Address lineAddr, const MemReq* req, bool updateReplacement);
+        // Returns candidate Index for insertion, wbLineAddr will point to its address for eviction.
+        int32_t preinsert(Address lineAddr, const MemReq* req, Address* wbLineAddr);
+        // returns a true if we should evict the associated map/data line. newLLHead is the Index of the new 
+        // LinkedList Head to pointed to from the data array.
+        bool evictAssociatedData(int32_t lineId, int32_t* newLLHead, bool* approximate);
+        // Actually inserts
+        void postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t mapId, int32_t listHead, bool approximate, bool updateReplacement);
+        // returns mapId
+        int32_t readMapId(int32_t tagId);
+        // returns dataId
+        int32_t readDataId(int32_t tagId);
+        // returns address
+        Address readAddress(int32_t tagId);
+        // returns next tagID in LL
+        int32_t readNextLL(int32_t tagId);
+        void initStats(AggregateStat* parent) {}
+        void print();
+};
+
+class uniDoppelgangerDataArray {
+    protected:
+        bool* approximate;
+        int32_t* mtagArray;
+        int32_t* tagPointerArray;
+        ReplPolicy* rp;
+        HashFamily* hf;
+        uint32_t numLines;
+        uint32_t numSets;
+        uint32_t assoc;
+        uint32_t setMask;
+
+    public:
+        uniDoppelgangerDataArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
+        ~uniDoppelgangerDataArray();
+        // Returns the Index of the matching map, Must find.
+        int32_t lookup(uint32_t map, const MemReq* req, bool updateReplacement);
+        // Return the map of this data line
+        uint32_t calculateMap(const DataLine data, DataType type, DataValue minValue, DataValue maxValue);
+        // Returns candidate ID for insertion, tagID will point to a tag list head that need to be evicted.
+        int32_t preinsert(uint32_t map, const MemReq* req, int32_t* tagId);
+        // Actually inserts
+        void postinsert(int32_t map, const MemReq* req, int32_t mapId, int32_t tagId, bool approximate, bool updateReplacement);
+        // returns tagId
+        int32_t readListHead(int32_t mapId);
+        // returns map
+        int32_t readMap(int32_t mapId);
+        void initStats(AggregateStat* parent) {}
+        void print();
+};
+// uniDoppelganger End
 
 /* The cache array that started this simulator :) */
 class ZArray : public CacheArray {
