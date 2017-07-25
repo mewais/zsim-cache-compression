@@ -3,6 +3,8 @@
 
 #include "timing_cache.h"
 
+class uHitWritebackEvent;
+
 class uniDoppelgangerCache : public TimingCache {
     protected:
         // Cache stuff
@@ -25,8 +27,19 @@ class uniDoppelgangerCache : public TimingCache {
 
         uint64_t access(MemReq& req);
 
+        void simulateHitWriteback(uHitWritebackEvent* ev, uint64_t cycle, HitEvent* he);
+
     protected:
         void initCacheStats(AggregateStat* cacheStat);
+};
+
+class uHitWritebackEvent : public TimingEvent {
+    private:
+        uniDoppelgangerCache* cache;
+        HitEvent* he;
+    public:
+        uHitWritebackEvent(uniDoppelgangerCache* _cache,  HitEvent* _he, uint32_t postDelay, int32_t domain) : TimingEvent(0, postDelay, domain), cache(_cache), he(_he) {}
+        void simulate(uint64_t startCycle) {cache->simulateHitWriteback(this, startCycle, he);}
 };
 
 #endif // UNIDOPPELGANGER_CACHE_H_

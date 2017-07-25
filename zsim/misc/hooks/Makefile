@@ -4,7 +4,7 @@
 JDK_PATH=$(shell dirname $(shell dirname $(shell (readlink -f `which javac`))))
 
 # Common deps
-DEPS=Makefile zsim_hooks.h zsim_malloc.h zsim_new.cpp
+DEPS=Makefile zsim_hooks.h zsim_malloc.h zsim_new.cpp zsim_malloc.c
 
 default: test_c test_cpp test_fortran test.class
 
@@ -17,6 +17,11 @@ libzsim_new.a: $(DEPS)
 	g++ -O3 -g --std=c++11 -fPIC -o zsim_new.o -c zsim_new.cpp
 	ar rcs libzsim_new.a zsim_new.o
 	ranlib libzsim_new.a
+
+libzsim_malloc.a: $(DEPS)
+	g++ -O3 -g --std=c++11 -fPIC -o zsim_malloc.o -c zsim_malloc.c
+	ar rcs libzsim_malloc.a zsim_malloc.o
+	ranlib libzsim_malloc.a
 
 zsim.class: $(DEPS) zsim_jni.cpp zsim.java
 	$(JDK_PATH)/bin/javah -o zsim_jni.h zsim  # generates header from zsim.java

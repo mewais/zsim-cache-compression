@@ -3,6 +3,8 @@
 
 #include "timing_cache.h"
 
+class HitWritebackEvent;
+
 class DoppelgangerCache : public TimingCache {
     protected:
         // Cache stuff
@@ -31,10 +33,21 @@ class DoppelgangerCache : public TimingCache {
         //NOTE: reqWriteback is pulled up to true, but not pulled down to false.
         uint64_t invalidate(const InvReq& req);
         
+        void simulateHitWriteback(HitWritebackEvent* ev, uint64_t cycle, HitEvent* he);
+        
     protected:
         void initCacheStats(AggregateStat* cacheStat);
         void startInvalidate(const InvReq& req); // grabs cc's downLock
         uint64_t finishInvalidate(const InvReq& req); // performs inv and releases downLock
+};
+
+class HitWritebackEvent : public TimingEvent {
+    private:
+        DoppelgangerCache* cache;
+        HitEvent* he;
+    public:
+        HitWritebackEvent(DoppelgangerCache* _cache,  HitEvent* _he, uint32_t postDelay, int32_t domain) : TimingEvent(0, postDelay, domain), cache(_cache), he(_he) {}
+        void simulate(uint64_t startCycle) {cache->simulateHitWriteback(this, startCycle, he);}
 };
 
 #endif // DOPPELGANGER_CACHE_H_

@@ -102,8 +102,8 @@ uint64_t TimingCache::access(MemReq& req) {
 
         if (getDoneCycle - req.cycle == accLat) {
             // Hit
-            assert(!writebackRecord.isValid());
-            assert(!accessRecord.isValid());
+            // assert(!writebackRecord.isValid());
+            // assert(!accessRecord.isValid());
             uint64_t hitLat = respCycle - req.cycle; // accLat + invLat
             HitEvent* ev = new (evRec) HitEvent(this, hitLat, domain);
             ev->setMinStartCycle(req.cycle);

@@ -47,19 +47,21 @@ static inline void zsim_work_begin() { zsim_magic_op(ZSIM_MAGIC_OP_WORK_BEGIN); 
 static inline void zsim_work_end() { zsim_magic_op(ZSIM_MAGIC_OP_WORK_END); }
 
 typedef enum {
-    HOOKS_UINT8,
-    HOOKS_INT8,
-    HOOKS_UINT16,
-    HOOKS_INT16,
-    HOOKS_UINT32,
-    HOOKS_INT32,
-    HOOKS_UINT64,
-    HOOKS_INT64,
-    HOOKS_FLOAT,
-    HOOKS_DOUBLE
+    HOOKS_UINT8 = 0,
+    HOOKS_INT8 = 1,
+    HOOKS_UINT16 = 2,
+    HOOKS_INT16 = 3,
+    HOOKS_UINT32 = 4,
+    HOOKS_INT32 = 5,
+    HOOKS_UINT64 = 6,
+    HOOKS_INT64 = 7,
+    HOOKS_FLOAT = 8,
+    HOOKS_DOUBLE = 9,
+    HOOKS_float = 8,
+    HOOKS_double = 9
 } DataType;
 
-union DataValue
+typedef union
 {
     uint8_t HOOKS_UINT8;
     int8_t HOOKS_INT8;
@@ -71,11 +73,15 @@ union DataValue
     int64_t HOOKS_INT64;
     float HOOKS_FLOAT;
     double HOOKS_DOUBLE;
-};
+} DataValue;
 
-static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, DataType Type, DataValue* Min, DataValue* Max)
+static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, DataType Type)
 {
     printf("[" HOOKS_STR "] Approximate Allocation\n");
+    DataValue Min;
+    DataValue Max;
+    Min.HOOKS_FLOAT = 0;
+    Max.HOOKS_FLOAT = 1000;
     __asm__ __volatile__
     (
         ".byte 0x0F, 0x1F, 0x80, 0xFF, 0x00, 0x11, 0x22 ;\n\t"
@@ -85,10 +91,27 @@ static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, D
         "add %5, %3 ;\n\t"
         "add %5, %4 ;\n\t"
         :
-        : "r" ((uint64_t)Start), "r" (ByteLength), "r" (Type), "r" ((uint64_t)Min), "r" ((uint64_t)Max), "i" (0)
+        : "r" ((uint64_t)Start), "r" (ByteLength), "r" (Type), "r" ((uint64_t)&Min), "r" ((uint64_t)&Max), "i" (0)
         :
     );
 }
+
+// static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, DataType Type, DataValue* Min, DataValue* Max)
+// {
+//     printf("[" HOOKS_STR "] Approximate Allocation\n");
+//     __asm__ __volatile__
+//     (
+//         ".byte 0x0F, 0x1F, 0x80, 0xFF, 0x00, 0x11, 0x22 ;\n\t"
+//         "add %5, %0 ;\n\t"
+//         "add %5, %1 ;\n\t"
+//         "add %5, %2 ;\n\t"
+//         "add %5, %3 ;\n\t"
+//         "add %5, %4 ;\n\t"
+//         :
+//         : "r" ((uint64_t)Start), "r" (ByteLength), "r" (Type), "r" ((uint64_t)Min), "r" ((uint64_t)Max), "i" (0)
+//         :
+//     );
+// }
 
 static inline void zsim_reallocate_approximate(void* Start, uint64_t ByteLength)
 {
