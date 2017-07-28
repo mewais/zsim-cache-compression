@@ -71,7 +71,7 @@ class zsim_allocator<float>: public std::allocator<float>
             float* p = std::allocator<float>::allocate(n, hint);
             if (p)
             {
-                zsim_minValue.HOOKS_FLOAT = FLT_MIN;
+                zsim_minValue.HOOKS_FLOAT = -FLT_MAX;
                 zsim_maxValue.HOOKS_FLOAT = FLT_MAX;
                 zsim_allocate_approximate(p, n*sizeof(float), HOOKS_FLOAT, &zsim_minValue, &zsim_maxValue);
             }
@@ -113,7 +113,7 @@ class zsim_allocator<double>: public std::allocator<double>
             double* p = std::allocator<double>::allocate(n, hint);
             if (p)
             {
-                zsim_minValue.HOOKS_DOUBLE = DBL_MIN;
+                zsim_minValue.HOOKS_DOUBLE = -DBL_MAX;
                 zsim_maxValue.HOOKS_DOUBLE = DBL_MAX;
                 zsim_allocate_approximate(p, n*sizeof(double), HOOKS_DOUBLE, &zsim_minValue, &zsim_maxValue);
             }
@@ -156,7 +156,7 @@ class explicit_zsim_float_allocator: public std::allocator<T>
             T* p = std::allocator<T>::allocate(n, hint);
             if (p)
             {
-                zsim_minValue.HOOKS_FLOAT = FLT_MIN;
+                zsim_minValue.HOOKS_FLOAT = -FLT_MAX;
 	            zsim_maxValue.HOOKS_FLOAT = FLT_MAX;
                 zsim_allocate_approximate(p, n*sizeof(T), HOOKS_FLOAT, &zsim_minValue, &zsim_maxValue);
             }
@@ -177,7 +177,7 @@ class explicit_zsim_double_allocator: public std::allocator<T>
     private:
         DataValue zsim_minValue;
         DataValue zsim_maxValue;
-        
+
     public:
 
         template<typename U1>
@@ -199,7 +199,7 @@ class explicit_zsim_double_allocator: public std::allocator<T>
             T* p = std::allocator<T>::allocate(n, hint);
             if (p)
             {
-                zsim_minValue.HOOKS_DOUBLE = DBL_MIN;
+                zsim_minValue.HOOKS_DOUBLE = -DBL_MAX;
 	            zsim_maxValue.HOOKS_DOUBLE = DBL_MAX;
                 zsim_allocate_approximate(p, n*sizeof(T), HOOKS_DOUBLE, &zsim_minValue, &zsim_maxValue);
             }

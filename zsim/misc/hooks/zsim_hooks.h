@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <float.h>
 
 //Avoid optimizing compilers moving code around this barrier
 #define COMPILER_BARRIER() { __asm__ __volatile__("" ::: "memory");}
@@ -77,11 +78,11 @@ typedef union
 
 static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, DataType Type)
 {
-    printf("[" HOOKS_STR "] Approximate Allocation\n");
+    // printf("[" HOOKS_STR "] Approximate Allocation\n");
     DataValue Min;
     DataValue Max;
-    Min.HOOKS_FLOAT = 0;
-    Max.HOOKS_FLOAT = 1000;
+    Min.HOOKS_FLOAT = -FLT_MAX;
+    Max.HOOKS_FLOAT = FLT_MAX;
     __asm__ __volatile__
     (
         ".byte 0x0F, 0x1F, 0x80, 0xFF, 0x00, 0x11, 0x22 ;\n\t"
@@ -96,26 +97,26 @@ static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, D
     );
 }
 
-// static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, DataType Type, DataValue* Min, DataValue* Max)
-// {
-//     printf("[" HOOKS_STR "] Approximate Allocation\n");
-//     __asm__ __volatile__
-//     (
-//         ".byte 0x0F, 0x1F, 0x80, 0xFF, 0x00, 0x11, 0x22 ;\n\t"
-//         "add %5, %0 ;\n\t"
-//         "add %5, %1 ;\n\t"
-//         "add %5, %2 ;\n\t"
-//         "add %5, %3 ;\n\t"
-//         "add %5, %4 ;\n\t"
-//         :
-//         : "r" ((uint64_t)Start), "r" (ByteLength), "r" (Type), "r" ((uint64_t)Min), "r" ((uint64_t)Max), "i" (0)
-//         :
-//     );
-// }
+static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, DataType Type, DataValue* Min, DataValue* Max)
+{
+    // printf("[" HOOKS_STR "] Approximate Allocation\n");
+    __asm__ __volatile__
+    (
+        ".byte 0x0F, 0x1F, 0x80, 0xFF, 0x00, 0x11, 0x22 ;\n\t"
+        "add %5, %0 ;\n\t"
+        "add %5, %1 ;\n\t"
+        "add %5, %2 ;\n\t"
+        "add %5, %3 ;\n\t"
+        "add %5, %4 ;\n\t"
+        :
+        : "r" ((uint64_t)Start), "r" (ByteLength), "r" (Type), "r" ((uint64_t)Min), "r" ((uint64_t)Max), "i" (0)
+        :
+    );
+}
 
 static inline void zsim_reallocate_approximate(void* Start, uint64_t ByteLength)
 {
-    printf("[" HOOKS_STR "] Approximate Reallocation\n");
+    // printf("[" HOOKS_STR "] Approximate Reallocation\n");
     __asm__ __volatile__
     (
         ".byte 0x0F, 0x1F, 0x80, 0xFF, 0x00, 0x11, 0x33 ;\n\t"
@@ -130,7 +131,7 @@ static inline void zsim_reallocate_approximate(void* Start, uint64_t ByteLength)
 
 static inline void zsim_deallocate_approximate(void* Start)
 {
-    printf("[" HOOKS_STR "] Approximate Deallocation\n");
+    // printf("[" HOOKS_STR "] Approximate Deallocation\n");
     __asm__ __volatile__
     (
         ".byte 0x0F, 0x1F, 0x80, 0xFF, 0x00, 0x11, 0x44 ;\n\t"

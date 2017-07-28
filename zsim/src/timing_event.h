@@ -259,12 +259,14 @@ class TimingEvent {
                 TimingEventBlock* teb = children;
                 while (teb) {
                     TimingEventBlock* next = teb->next;
+                    // info("FREE: %p at %u", this, __LINE__);
                     slab::freeElem((void*)teb, sizeof(teb));
                     teb = next;
                 }
                 children = nullptr;
                 numChildren = 0;
             }
+            // info("FREE: %p at %u", this, __LINE__);
             slab::freeElem((void*)this, sizeof(TimingEvent));
         }
 

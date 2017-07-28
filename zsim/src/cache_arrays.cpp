@@ -67,397 +67,6 @@ void SetAssocArray::postinsert(const Address lineAddr, const MemReq* req, uint32
     rp->update(candidate, req);
 }
 
-// Doppelganger Start
-DoppelgangerTagArray::DoppelgangerTagArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf) : rp(_rp), hf(_hf), numLines(_numLines), assoc(_assoc)  {
-    tagArray = gm_calloc<Address>(numLines);
-    prevPointerArray = gm_calloc<int32_t>(numLines);
-    nextPointerArray = gm_calloc<int32_t>(numLines);
-    mapPointerArray = gm_calloc<int32_t>(numLines);
-    for (uint32_t i = 0; i < numLines; i++) {
-        prevPointerArray[i] = -1;
-        nextPointerArray[i] = -1;
-        mapPointerArray[i] = -1;
-    }
-    numSets = numLines/assoc;
-    setMask = numSets - 1;
-    assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
-}
-
-DoppelgangerTagArray::~DoppelgangerTagArray() {
-    gm_free(tagArray);
-    gm_free(prevPointerArray);
-    gm_free(nextPointerArray);
-    gm_free(mapPointerArray);
-}
-
-int32_t DoppelgangerTagArray::lookup(Address lineAddr, const MemReq* req, bool updateReplacement) {
-    uint32_t set = hf->hash(0, lineAddr) & setMask;
-    uint32_t first = set*assoc;
-    for (uint32_t id = first; id < first + assoc; id++) {
-        if (tagArray[id] ==  lineAddr) {
-            if (updateReplacement) rp->update(id, req);
-            return id;
-        }
-    }
-    return -1;
-}
-
-int32_t DoppelgangerTagArray::preinsert(Address lineAddr, const MemReq* req, Address* wbLineAddr) {
-    uint32_t set = hf->hash(0, lineAddr) & setMask;
-    uint32_t first = set*assoc;
-
-    uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc));
-
-    *wbLineAddr = tagArray[candidate];
-    return candidate;
-}
-
-bool DoppelgangerTagArray::evictAssociatedData(int32_t lineId, int32_t* newLLHead) {
-    *newLLHead = -1;
-    if (mapPointerArray[lineId] == -1)
-        return false;
-    if (prevPointerArray[lineId] != -1)
-        return false;
-    else
-        *newLLHead = nextPointerArray[lineId];
-    if (nextPointerArray[lineId] != -1)
-        return false;
-    return true;
-}
-
-void DoppelgangerTagArray::postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t mapId, int32_t listHead, bool updateReplacement) {
-    rp->replaced(tagId);
-    tagArray[tagId] = lineAddr;
-    mapPointerArray[tagId] = mapId;
-    if (prevPointerArray[tagId] != -1)
-        nextPointerArray[prevPointerArray[tagId]] = nextPointerArray[tagId];
-    if (nextPointerArray[tagId] != -1)
-        prevPointerArray[nextPointerArray[tagId]] = prevPointerArray[tagId];
-    prevPointerArray[tagId] = -1;
-    nextPointerArray[tagId] = listHead;
-    if (listHead >= 0) {
-        if(prevPointerArray[listHead] == -1) prevPointerArray[listHead] = tagId;
-        else panic("List head is not actually a list head!");
-    }
-    if(updateReplacement) rp->update(mapId, req);
-}
-
-int32_t DoppelgangerTagArray::readMapId(int32_t tagId) {
-    return mapPointerArray[tagId];
-}
-
-Address DoppelgangerTagArray::readAddress(int32_t tagId) {
-    return tagArray[tagId];
-}
-
-int32_t DoppelgangerTagArray::readNextLL(int32_t tagId) {
-    return nextPointerArray[tagId];
-}
-
-void DoppelgangerTagArray::print() {
-    for (uint32_t i = 0; i < this->numLines; i++) {
-        if (mapPointerArray[i] != -1)
-            info("%i: %lu, %i, %i, %i", i, tagArray[i] << lineBits, prevPointerArray[i], nextPointerArray[i], mapPointerArray[i]);
-    }
-}
-
-DoppelgangerDataArray::DoppelgangerDataArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf) : rp(_rp), hf(_hf), numLines(_numLines), assoc(_assoc)  {
-    mtagArray = gm_calloc<int32_t>(numLines);
-    tagPointerArray = gm_calloc<int32_t>(numLines);
-    for (uint32_t i = 0; i < numLines; i++) {
-        tagPointerArray[i] = -1;
-        mtagArray[i] = -1;
-    }
-    numSets = numLines/assoc;
-    setMask = numSets - 1;
-    assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
-}
-
-DoppelgangerDataArray::~DoppelgangerDataArray() {
-    gm_free(mtagArray);
-    gm_free(tagPointerArray);
-}
-
-int32_t DoppelgangerDataArray::lookup(uint32_t map, const MemReq* req, bool updateReplacement) {
-    uint32_t set = hf->hash(0, map) & setMask;
-    uint32_t first = set*assoc;
-    for (uint32_t id = first; id < first + assoc; id++) {
-        if (mtagArray[id] == (int32_t)map) {
-            if (updateReplacement) rp->update(id, req);
-            return id;
-        }
-    }
-    return -1;
-}
-
-uint32_t DoppelgangerDataArray::calculateMap(const DataLine data, DataType type, DataValue minValue, DataValue maxValue) {
-    // Get hash and map values
-    // info("data: %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3], ((float*)data)[4], ((float*)data)[5], ((float*)data)[6], ((float*)data)[7], ((float*)data)[8], ((float*)data)[9], ((float*)data)[10], ((float*)data)[11], ((float*)data)[12], ((float*)data)[13], ((float*)data)[14], ((float*)data)[15]);
-    int64_t intAvgHash = 0, intRangeHash = 0;
-    double floatAvgHash = 0, floatRangeHash = 0;
-    int64_t intMax = std::numeric_limits<int64_t>::min(), 
-            intMin = std::numeric_limits<int64_t>::max(),
-            intSum = 0;
-    double floatMax = std::numeric_limits<double>::min(),
-            floatMin = std::numeric_limits<double>::max(),
-            floatSum = 0;
-    double mapStep = 0;
-    int32_t avgMap = 0, rangeMap = 0;
-    uint32_t map = 0;
-    switch (type)
-    {
-        case ZSIM_UINT8:
-            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(uint8_t); i++) {
-                intSum += ((uint8_t*) data)[i];
-                if (((uint8_t*) data)[i] > intMax)
-                    intMax = ((uint8_t*) data)[i];
-                if (((uint8_t*) data)[i] < intMin)
-                    intMin = ((uint8_t*) data)[i];
-            }
-            intAvgHash = intSum/(zinfo->lineSize/sizeof(uint8_t));
-            intRangeHash = intMax - intMin;
-            if (intMax > maxValue.UINT8)
-                panic("Received a value bigger than the annotation's Max!!");
-            if (intMin < minValue.UINT8)
-                panic("Received a value lower than the annotation's Min!!");
-            if (zinfo->mapSize > sizeof(uint8_t)) {
-                avgMap = intAvgHash;
-                rangeMap = intRangeHash;
-            } else {
-                mapStep = (maxValue.UINT8 - minValue.UINT8)/std::pow(2,zinfo->mapSize-1);
-                avgMap = intAvgHash/mapStep;
-                rangeMap = intRangeHash/mapStep;
-            }
-            break;
-        case ZSIM_INT8:
-            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(int8_t); i++) {
-                intSum += ((int8_t*) data)[i];
-                if (((int8_t*) data)[i] > intMax)
-                    intMax = ((int8_t*) data)[i];
-                if (((int8_t*) data)[i] < intMin)
-                    intMin = ((int8_t*) data)[i];
-            }
-            intAvgHash = intSum/(zinfo->lineSize/sizeof(int8_t));
-            intRangeHash = intMax - intMin;
-            if (intMax > maxValue.INT8)
-                panic("Received a value bigger than the annotation's Max!!");
-            if (intMin < minValue.INT8)
-                panic("Received a value lower than the annotation's Min!!");
-            if (zinfo->mapSize > sizeof(int8_t)) {
-                avgMap = intAvgHash;
-                rangeMap = intRangeHash;
-            } else {
-                mapStep = (maxValue.INT8 - minValue.INT8)/std::pow(2,zinfo->mapSize-1);
-                avgMap = intAvgHash/mapStep;
-                rangeMap = intRangeHash/mapStep;
-            }
-            break;
-        case ZSIM_UINT16:
-            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(uint16_t); i++) {
-                intSum += ((uint16_t*) data)[i];
-                if (((uint16_t*) data)[i] > intMax)
-                    intMax = ((uint16_t*) data)[i];
-                if (((uint16_t*) data)[i] < intMin)
-                    intMin = ((uint16_t*) data)[i];
-            }
-            intAvgHash = intSum/(zinfo->lineSize/sizeof(uint16_t));
-            intRangeHash = intMax - intMin;
-            if (intMax > maxValue.UINT16)
-                panic("Received a value bigger than the annotation's Max!!");
-            if (intMin < minValue.UINT16)
-                panic("Received a value lower than the annotation's Min!!");
-            if (zinfo->mapSize > sizeof(uint16_t)) {
-                avgMap = intAvgHash;
-                rangeMap = intRangeHash;
-            } else {
-                mapStep = (maxValue.UINT16 - minValue.UINT16)/std::pow(2,zinfo->mapSize-1);
-                avgMap = intAvgHash/mapStep;
-                rangeMap = intRangeHash/mapStep;
-            }
-            break;
-        case ZSIM_INT16:
-            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(int16_t); i++) {
-                intSum += ((int16_t*) data)[i];
-                if (((int16_t*) data)[i] > intMax)
-                    intMax = ((int16_t*) data)[i];
-                if (((int16_t*) data)[i] < intMin)
-                    intMin = ((int16_t*) data)[i];
-            }
-            intAvgHash = intSum/(zinfo->lineSize/sizeof(int16_t));
-            intRangeHash = intMax - intMin;
-            if (intMax > maxValue.INT16)
-                panic("Received a value bigger than the annotation's Max!!");
-            if (intMin < minValue.INT16)
-                panic("Received a value lower than the annotation's Min!!");
-            if (zinfo->mapSize > sizeof(int16_t)) {
-                avgMap = intAvgHash;
-                rangeMap = intRangeHash;
-            } else {
-                mapStep = (maxValue.INT16 - minValue.INT16)/std::pow(2,zinfo->mapSize-1);
-                avgMap = intAvgHash/mapStep;
-                rangeMap = intRangeHash/mapStep;
-            }
-            break;
-        case ZSIM_UINT32:
-            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(uint32_t); i++) {
-                intSum += ((uint32_t*) data)[i];
-                if (((uint32_t*) data)[i] > intMax)
-                    intMax = ((uint32_t*) data)[i];
-                if (((uint32_t*) data)[i] < intMin)
-                    intMin = ((uint32_t*) data)[i];
-            }
-            intAvgHash = intSum/(zinfo->lineSize/sizeof(uint32_t));
-            intRangeHash = intMax - intMin;
-            if (intMax > maxValue.UINT32)
-                panic("Received a value bigger than the annotation's Max!!");
-            if (intMin < minValue.UINT32)
-                panic("Received a value lower than the annotation's Min!!");
-            mapStep = (maxValue.UINT32 - minValue.UINT32)/std::pow(2,zinfo->mapSize-1);
-            avgMap = intAvgHash/mapStep;
-            rangeMap = intRangeHash/mapStep;
-            break;
-        case ZSIM_INT32:
-            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(int32_t); i++) {
-                intSum += ((int32_t*) data)[i];
-                if (((int32_t*) data)[i] > intMax)
-                    intMax = ((int32_t*) data)[i];
-                if (((int32_t*) data)[i] < intMin)
-                    intMin = ((int32_t*) data)[i];
-            }
-            intAvgHash = intSum/(zinfo->lineSize/sizeof(int32_t));
-            intRangeHash = intMax - intMin;
-            if (intMax > maxValue.INT32)
-                panic("Received a value bigger than the annotation's Max!!");
-            if (intMin < minValue.INT32)
-                panic("Received a value lower than the annotation's Min!!");
-            mapStep = (maxValue.INT32 - minValue.INT32)/std::pow(2,zinfo->mapSize-1);
-            avgMap = intAvgHash/mapStep;
-            rangeMap = intRangeHash/mapStep;
-            break;
-        case ZSIM_UINT64:
-            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(uint64_t); i++) {
-                intSum += ((uint64_t*) data)[i];
-                if ((int64_t)(((uint64_t*) data)[i]) > intMax)
-                    intMax = ((uint64_t*) data)[i];
-                if ((int64_t)(((uint64_t*) data)[i]) < intMin)
-                    intMin = ((uint64_t*) data)[i];
-            }
-            intAvgHash = intSum/(zinfo->lineSize/sizeof(uint64_t));
-            intRangeHash = intMax - intMin;
-            if (intMax > (int64_t)maxValue.UINT64)
-                panic("Received a value bigger than the annotation's Max!!");
-            if (intMin < (int64_t)minValue.UINT64)
-                panic("Received a value lower than the annotation's Min!!");
-            mapStep = (maxValue.UINT64 - minValue.UINT64)/std::pow(2,zinfo->mapSize-1);
-            avgMap = intAvgHash/mapStep;
-            rangeMap = intRangeHash/mapStep;
-            break;
-        case ZSIM_INT64:
-            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(int64_t); i++) {
-                intSum += ((int64_t*) data)[i];
-                if (((int64_t*) data)[i] > intMax)
-                    intMax = ((int64_t*) data)[i];
-                if (((int64_t*) data)[i] < intMin)
-                    intMin = ((int64_t*) data)[i];
-            }
-            intAvgHash = intSum/(zinfo->lineSize/sizeof(int64_t));
-            intRangeHash = intMax - intMin;
-            if (intMax > maxValue.INT64)
-                panic("Received a value bigger than the annotation's Max!!");
-            if (intMin < minValue.INT64)
-                panic("Received a value lower than the annotation's Min!!");
-            mapStep = (maxValue.INT64 - minValue.INT64)/std::pow(2,zinfo->mapSize-1);
-            avgMap = intAvgHash/mapStep;
-            rangeMap = intRangeHash/mapStep;
-            break;
-        case ZSIM_FLOAT:
-            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(float); i++) {
-                floatSum += ((float*) data)[i];
-                if (((float*) data)[i] > floatMax)
-                    floatMax = ((float*) data)[i];
-                if (((float*) data)[i] < floatMin)
-                    floatMin = ((float*) data)[i];
-            }
-            floatAvgHash = floatSum/(zinfo->lineSize/sizeof(float));
-            // info("\tAvgHash: %f", floatAvgHash);
-            floatRangeHash = floatMax - floatMin;
-            // info("\tRangeHash: %f", floatRangeHash);
-            if (floatMax > maxValue.FLOAT)
-                panic("Received a value bigger than the annotation's Max!! %f, %f", floatMax, maxValue.FLOAT);
-            if (floatMin < minValue.FLOAT)
-                panic("Received a value lower than the annotation's Min!! %f, %f", floatMax, maxValue.FLOAT);
-            mapStep = (maxValue.FLOAT - minValue.FLOAT)/std::pow(2,zinfo->mapSize-1);
-            // info("\tmapStep: %f", mapStep);
-            avgMap = floatAvgHash/mapStep;
-            // info("\tAvgMap: %i", avgMap);
-            rangeMap = floatRangeHash/mapStep;
-            // info("\tRangeMap: %i", rangeMap);
-            break;
-        case ZSIM_DOUBLE:
-            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(double); i++) {
-                floatSum += ((double*) data)[i];
-                if (((double*) data)[i] > floatMax)
-                    floatMax = ((double*) data)[i];
-                if (((double*) data)[i] < floatMin)
-                    floatMin = ((double*) data)[i];
-            }
-            floatAvgHash = floatSum/(zinfo->lineSize/sizeof(double));
-            floatRangeHash = floatMax - floatMin;
-            if (floatMax > maxValue.DOUBLE)
-                panic("Received a value bigger than the annotation's Max!!");
-            if (floatMin < minValue.DOUBLE)
-                panic("Received a value lower than the annotation's Min!!");
-            mapStep = (maxValue.DOUBLE - minValue.DOUBLE)/std::pow(2,zinfo->mapSize-1);
-            avgMap = floatAvgHash/mapStep;
-            rangeMap = floatRangeHash/mapStep;
-            break;
-        default:
-            panic("Wrong Data Type!!");
-    }
-    map = ((uint32_t)avgMap << (32 - zinfo->mapSize)) >> (32 - zinfo->mapSize);
-    // info("\tAvgMap2: %i", map);
-    rangeMap = ((uint32_t)rangeMap << (32 - zinfo->mapSize/2)) >> (32 - zinfo->mapSize/2);
-    // info("\tRangeMap2: %i", rangeMap);
-    rangeMap = (rangeMap << zinfo->mapSize);
-    // info("\tRangeMap3: %i", rangeMap);
-    map |= rangeMap;
-    // info("\t\tMap: %i", map);
-    return map;
-}
-
-int32_t DoppelgangerDataArray::preinsert(uint32_t map, const MemReq* req, int32_t* tagId) {
-    uint32_t set = hf->hash(0, map) & setMask;
-    uint32_t first = set*assoc;
-
-    uint32_t mapId = rp->rankCands(req, SetAssocCands(first, first+assoc));
-
-    *tagId = tagPointerArray[mapId];
-    return mapId;
-}
-
-void DoppelgangerDataArray::postinsert(uint32_t map, const MemReq* req, int32_t mapId, int32_t tagId, bool updateReplacement) {
-    rp->replaced(mapId);
-    mtagArray[mapId] = map;
-    tagPointerArray[mapId] = tagId;
-    if(updateReplacement) rp->update(mapId, req);
-}
-
-int32_t DoppelgangerDataArray::readListHead(int32_t mapId) {
-    return tagPointerArray[mapId];
-}
-
-int32_t DoppelgangerDataArray::readMap(int32_t mapId) {
-    return mtagArray[mapId];
-}
-
-void DoppelgangerDataArray::print() {
-    for (uint32_t i = 0; i < this->numLines; i++) {
-        if (tagPointerArray[i] != -1)
-            info("%i: %u, %i", i, mtagArray[i], tagPointerArray[i]);
-    }
-}
-// Doppelganger End
-
 // uniDoppelganger Start
 uniDoppelgangerTagArray::uniDoppelgangerTagArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf) : rp(_rp), hf(_hf), numLines(_numLines), assoc(_assoc)  {
     tagArray = gm_calloc<Address>(numLines);
@@ -472,6 +81,7 @@ uniDoppelgangerTagArray::uniDoppelgangerTagArray(uint32_t _numLines, uint32_t _a
     }
     numSets = numLines/assoc;
     setMask = numSets - 1;
+    validLines = 0;
     assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
 }
 
@@ -522,6 +132,11 @@ bool uniDoppelgangerTagArray::evictAssociatedData(int32_t lineId, int32_t* newLL
 }
 
 void uniDoppelgangerTagArray::postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t mapId, int32_t listHead, bool approximate, bool updateReplacement) {
+    if (!tagArray[tagId] && lineAddr) {
+        validLines++;
+    } else if (tagArray[tagId] && !lineAddr) {
+        validLines--;
+    }
     rp->replaced(tagId);
     tagArray[tagId] = lineAddr;
     mapPointerArray[tagId] = mapId;
@@ -557,6 +172,10 @@ int32_t uniDoppelgangerTagArray::readNextLL(int32_t tagId) {
     return nextPointerArray[tagId];
 }
 
+uint32_t uniDoppelgangerTagArray::getValidLines() {
+    return validLines;
+}
+
 void uniDoppelgangerTagArray::print() {
     for (uint32_t i = 0; i < this->numLines; i++) {
         if (mapPointerArray[i] != -1)
@@ -574,6 +193,7 @@ uniDoppelgangerDataArray::uniDoppelgangerDataArray(uint32_t _numLines, uint32_t 
     }
     numSets = numLines/assoc;
     setMask = numSets - 1;
+    validLines = 0;
     assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
 }
 
@@ -785,9 +405,9 @@ uint32_t uniDoppelgangerDataArray::calculateMap(const DataLine data, DataType ty
             floatAvgHash = floatSum/(zinfo->lineSize/sizeof(float));
             floatRangeHash = floatMax - floatMin;
             if (floatMax > maxValue.FLOAT)
-                panic("Received a value bigger than the annotation's Max!! %f, %f", floatMax, maxValue.FLOAT);
+                panic("Received a value bigger than the annotation's Max!! %.10f, %.10f", floatMax, maxValue.FLOAT);
             if (floatMin < minValue.FLOAT)
-                panic("Received a value lower than the annotation's Min!! %f, %f", floatMax, maxValue.FLOAT);
+                panic("Received a value lower than the annotation's Min!! %.10f, %.10f", floatMin, minValue.FLOAT);
             mapStep = (maxValue.FLOAT - minValue.FLOAT)/std::pow(2,zinfo->mapSize-1);
             avgMap = floatAvgHash/mapStep;
             rangeMap = floatRangeHash/mapStep;
@@ -831,6 +451,11 @@ int32_t uniDoppelgangerDataArray::preinsert(uint32_t map, const MemReq* req, int
 }
 
 void uniDoppelgangerDataArray::postinsert(int32_t map, const MemReq* req, int32_t mapId, int32_t tagId, bool approximate, bool updateReplacement) {
+    if (tagPointerArray[mapId] == -1 && tagId != -1) {
+        validLines++;
+    } else if (tagPointerArray[mapId] != -1 && tagId == -1) {
+        validLines--;
+    }
     rp->replaced(mapId);
     mtagArray[mapId] = map;
     tagPointerArray[mapId] = tagId;
@@ -851,6 +476,10 @@ void uniDoppelgangerDataArray::print() {
         if (tagPointerArray[i] != -1)
             info("%i: %i, %i, %s", i, mtagArray[i], tagPointerArray[i], approximate[i]? "approximate":"exact");
     }
+}
+
+uint32_t uniDoppelgangerDataArray::getValidLines() {
+    return validLines;
 }
 // uniDoppelganger End
 

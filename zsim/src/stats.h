@@ -77,6 +77,7 @@
 #include <stdint.h>
 #include <string>
 #include "g_std/g_vector.h"
+#include "g_std/g_string.h"
 #include "log.h"
 
 class Stat : public GlobAlloc {
@@ -412,6 +413,28 @@ class HDF5Backend : public StatsBackend {
     public:
         HDF5Backend(const char* filename, AggregateStat* rootStat, size_t bytesPerWrite, bool skipVectors, bool sumRegularAggregates);
         virtual void dump(bool buffered);
+};
+
+class RunningStats {
+    public:
+        explicit RunningStats(g_string& name) throw();
+        void add(double sample, double weight = 1) throw();
+        void reset() throw();
+        double getMin() const throw();
+        double getMax() const throw();
+        double getMean() const throw();
+        double getStdDev() const throw();
+        void combineWith(const RunningStats &otherStats) throw();
+        inline unsigned long long sampleCount()  { return numSamples; }
+        void dump();
+    private:
+        double minimum;
+        double maximum;
+        double mean;
+        double varNumer;
+        double weightSum;
+        unsigned long long numSamples;
+        g_string name;
 };
 
 #endif  // STATS_H_

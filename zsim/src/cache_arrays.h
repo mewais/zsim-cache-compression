@@ -74,73 +74,6 @@ class SetAssocArray : public CacheArray {
         void postinsert(const Address lineAddr, const MemReq* req, uint32_t candidate);
 };
 
-// Doppelganger Start
-class DoppelgangerTagArray {
-    protected:
-        Address* tagArray;
-        int32_t* prevPointerArray;
-        int32_t* nextPointerArray;
-        int32_t* mapPointerArray;
-        ReplPolicy* rp;
-        HashFamily* hf;
-        uint32_t numLines;
-        uint32_t numSets;
-        uint32_t assoc;
-        uint32_t setMask;
-
-    public:
-        DoppelgangerTagArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
-        ~DoppelgangerTagArray();
-        // Returns the Index of the matching tag, or -1 if none found.
-        int32_t lookup(Address lineAddr, const MemReq* req, bool updateReplacement);
-        // Returns candidate Index for insertion, wbLineAddr will point to its address for eviction.
-        int32_t preinsert(Address lineAddr, const MemReq* req, Address* wbLineAddr);
-        // returns a true if we should evict the associated map/data line. newLLHead is the Index of the new 
-        // LinkedList Head to pointed to from the data array.
-        bool evictAssociatedData(int32_t lineId, int32_t* newLLHead);
-        // Actually inserts
-        void postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t mapId, int32_t listHead, bool updateReplacement);
-        // returns mapId
-        int32_t readMapId(int32_t tagId);
-        // returns address
-        Address readAddress(int32_t tagId);
-        // returns next tagID in LL
-        int32_t readNextLL(int32_t tagId);
-        void initStats(AggregateStat* parent) {}
-        void print();
-};
-
-class DoppelgangerDataArray {
-    protected:
-        int32_t* mtagArray;
-        int32_t* tagPointerArray;
-        ReplPolicy* rp;
-        HashFamily* hf;
-        uint32_t numLines;
-        uint32_t numSets;
-        uint32_t assoc;
-        uint32_t setMask;
-
-    public:
-        DoppelgangerDataArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
-        ~DoppelgangerDataArray();
-        // Returns the Index of the matching map, Must find.
-        int32_t lookup(uint32_t map, const MemReq* req, bool updateReplacement);
-        // Return the map of this data line
-        uint32_t calculateMap(const DataLine data, DataType type, DataValue minValue, DataValue maxValue);
-        // Returns candidate ID for insertion, tagID will point to a tag list head that need to be evicted.
-        int32_t preinsert(uint32_t map, const MemReq* req, int32_t* tagId);
-        // Actually inserts
-        void postinsert(uint32_t map, const MemReq* req, int32_t mapId, int32_t tagId, bool updateReplacement);
-        // returns tagId
-        int32_t readListHead(int32_t mapId);
-        // returns map
-        int32_t readMap(int32_t mapId);
-        void initStats(AggregateStat* parent) {}
-        void print();
-};
-// Doppelganger End
-
 // uniDoppelganger Start
 class uniDoppelgangerTagArray {
     protected:
@@ -155,6 +88,8 @@ class uniDoppelgangerTagArray {
         uint32_t numSets;
         uint32_t assoc;
         uint32_t setMask;
+
+        uint32_t validLines;
 
     public:
         uniDoppelgangerTagArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
@@ -176,6 +111,7 @@ class uniDoppelgangerTagArray {
         Address readAddress(int32_t tagId);
         // returns next tagID in LL
         int32_t readNextLL(int32_t tagId);
+        uint32_t getValidLines();
         void initStats(AggregateStat* parent) {}
         void print();
 };
@@ -192,6 +128,8 @@ class uniDoppelgangerDataArray {
         uint32_t assoc;
         uint32_t setMask;
 
+        uint32_t validLines;
+
     public:
         uniDoppelgangerDataArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
         ~uniDoppelgangerDataArray();
@@ -207,6 +145,8 @@ class uniDoppelgangerDataArray {
         int32_t readListHead(int32_t mapId);
         // returns map
         int32_t readMap(int32_t mapId);
+
+        uint32_t getValidLines();
         void initStats(AggregateStat* parent) {}
         void print();
 };

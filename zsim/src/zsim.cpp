@@ -530,18 +530,18 @@ uint32_t TakeBarrier(uint32_t tid, uint32_t cid) {
 
 VOID PIN_FAST_ANALYSIS_CALL AllocateApproximateRegion(CONTEXT* cid, ADDRINT regStart, ADDRINT regSize, DataType dataType, DataValue* minValue, DataValue* maxValue)
 {
-    info("New Approximate Region: %lu, %lu", regStart, regStart+regSize);
-    zinfo->approximateRegions.push_back(std::make_tuple(regStart, regStart+regSize, dataType, *minValue, *maxValue));
+    // info("New Approximate Region: %lu, %lu", regStart, regStart+regSize);
+    zinfo->approximateRegions->push_back(std::make_tuple(regStart, regStart+regSize, dataType, *minValue, *maxValue));
 }
 
 VOID PIN_FAST_ANALYSIS_CALL ReallocateApproximateRegion(CONTEXT* cid, ADDRINT regStart, ADDRINT regSize)
 {
-    for (uint32_t i = 0; i < zinfo->approximateRegions.size(); i++)
+    for (uint32_t i = 0; i < zinfo->approximateRegions->size(); i++)
     {
-        if (std::get<0>(zinfo->approximateRegions[i]) == regStart)
+        if (std::get<0>((*zinfo->approximateRegions)[i]) == regStart)
         {
-            info("Approximate Region changed from: %lu, %lu to %lu, %lu", std::get<0>(zinfo->approximateRegions[i]), std::get<1>(zinfo->approximateRegions[i]), regStart, regStart+regSize);
-            std::get<1>(zinfo->approximateRegions[i]) = regStart + regSize;
+            // info("Approximate Region changed from: %lu, %lu to %lu, %lu", std::get<0>((*zinfo->approximateRegions)[i]), std::get<1>((*zinfo->approximateRegions)[i]), regStart, regStart+regSize);
+            std::get<1>((*zinfo->approximateRegions)[i]) = regStart + regSize;
             break;
         }
     }
@@ -549,12 +549,12 @@ VOID PIN_FAST_ANALYSIS_CALL ReallocateApproximateRegion(CONTEXT* cid, ADDRINT re
 
 VOID PIN_FAST_ANALYSIS_CALL DeallocateApproximateRegion(CONTEXT* cid, ADDRINT regStart)
 {
-    for (uint32_t i = 0; i < zinfo->approximateRegions.size(); i++)
+    for (uint32_t i = 0; i < zinfo->approximateRegions->size(); i++)
     {
-        if (std::get<0>(zinfo->approximateRegions[i]) == regStart)
+        if (std::get<0>((*zinfo->approximateRegions)[i]) == regStart)
         {
-            info("Deleted Approximate Region from: %lu, %lu", std::get<0>(zinfo->approximateRegions[i]), std::get<1>(zinfo->approximateRegions[i]));
-            zinfo->approximateRegions.erase(zinfo->approximateRegions.begin()+i);
+            // info("Deleted Approximate Region from: %lu, %lu", std::get<0>((*zinfo->approximateRegions)[i]), std::get<1>((*zinfo->approximateRegions)[i]));
+            zinfo->approximateRegions->erase(zinfo->approximateRegions->begin()+i);
             break;
         }
     }
@@ -1163,6 +1163,7 @@ VOID SimEnd() {
         for (AccessTraceWriter* t : *(zinfo->traceWriters)) t->dump(false);  // flushes trace writer
 
         if (zinfo->sched) zinfo->sched->notifyTermination();
+        for(uint32_t i = 0; i < zinfo->runningStats->size(); i++) (*zinfo->runningStats)[i]->dump();
     }
 
     //Uncomment when debugging termination races, which can be rare because they are triggered by threads of a dying process

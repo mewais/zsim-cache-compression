@@ -40,6 +40,7 @@ class Core;
 class Scheduler;
 class AggregateStat;
 class StatsBackend;
+class RunningStats;
 class ProcessTreeNode;
 class ProcessStats;
 class ProcStats;
@@ -139,6 +140,7 @@ struct GlobSimInfo {
 
     AggregateStat* rootStat;
     g_vector<StatsBackend*>* statsBackends; // used for termination dumps
+    g_vector<RunningStats*>* runningStats;
     StatsBackend* periodicStatsBackend;
     StatsBackend* eventualStatsBackend;
     ProcessStats* processStats;
@@ -188,7 +190,7 @@ struct GlobSimInfo {
 
     bool approximate;
     // start, end, type, min, max
-    g_vector<std::tuple<uint64_t, uint64_t, DataType, DataValue, DataValue>> approximateRegions;
+    g_vector<std::tuple<uint64_t, uint64_t, DataType, DataValue, DataValue>>* approximateRegions;
 };
 
 

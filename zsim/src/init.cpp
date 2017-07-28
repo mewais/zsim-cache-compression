@@ -41,7 +41,6 @@
 #include "detailed_mem_params.h"
 #include "ddr_mem.h"
 #include "debug_zsim.h"
-#include "doppelganger_cache.h"
 #include "unidoppelganger_cache.h"
 #include "dramsim_mem_ctrl.h"
 #include "event_queue.h"
@@ -85,6 +84,7 @@ extern void EndOfPhaseActions(); //in zsim.cpp
  */
 
 BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, uint32_t bankSize, bool isTerminal, uint32_t domain) {
+    if (!zinfo->runningStats) zinfo->runningStats = new g_vector<RunningStats*>();
     string type = config.get<const char*>(prefix + "type", "Simple");
     // Shortcut for TraceDriven type
     if (type == "TraceDriven") {
@@ -106,7 +106,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
     uint32_t candidates = (arrayType == "Z")? config.get<uint32_t>(prefix + "array.candidates", 16) : ways;
 
     //Need to know number of hash functions before instantiating array
-    if (arrayType == "SetAssoc" || arrayType == "Doppelganger" || arrayType == "uniDoppelganger") {
+    if (arrayType == "SetAssoc" || arrayType == "uniDoppelganger") {
         numHashes = 1;
     } else if (arrayType == "Z") {
         numHashes = ways;
@@ -233,21 +233,11 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
 
     //Alright, build the array
     CacheArray* array = nullptr;
-    DoppelgangerTagArray* tagArray = nullptr;
-    DoppelgangerDataArray* dataArray = nullptr;
     uniDoppelgangerTagArray* utagArray = nullptr;
     uniDoppelgangerDataArray* udataArray = nullptr;
     ReplPolicy* tagRP = nullptr;
     ReplPolicy* dataRP = nullptr;
-    ReplPolicy* tmpRP = nullptr;
-    if (arrayType == "Doppelganger") {
-        tagRP = new LRUReplPolicy<true>(numLines/2);
-        dataRP = new DataLRUReplPolicy(numLines/8);
-        tagArray = new DoppelgangerTagArray(numLines/2, ways, tagRP, hf);
-        dataArray = new DoppelgangerDataArray(numLines/8, ways, dataRP, hf);
-        tmpRP = new LRUReplPolicy<true>(numLines/2);
-        array = new SetAssocArray(numLines/2, ways, tmpRP, hf);
-    } else if (arrayType == "uniDoppelganger") {
+    if (arrayType == "uniDoppelganger") {
         tagRP = new LRUReplPolicy<true>(numLines);
         dataRP = new DataLRUReplPolicy(numLines/2);
         utagArray = new uniDoppelgangerTagArray(numLines, ways, tagRP, hf);
@@ -294,34 +284,15 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
     if (!isTerminal) {
         if (type == "Simple") {
             cache = new Cache(numLines, cc, array, rp, accLat, invLat, name);
-        } else if (type == "Doppelganger") {
-            CC* dcc = new MESICC(numLines/2, nonInclusiveHack, name);
-            delete(cc);
-            cc = new MESICC(numLines/2, nonInclusiveHack, name);
-            uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
-            uint32_t tagLat = config.get<uint32_t>(prefix + "tagLat", 5);
-            uint32_t mtagLat = config.get<uint32_t>(prefix + "mtagLat", 2);
-            uint32_t mapLat = config.get<uint32_t>(prefix + "mapLat", 2);
-            uint32_t dataLat = config.get<uint32_t>(prefix + "dataLat", 2);
-            uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
-            tagRP->setCC(dcc);
-            tmpRP->setCC(cc);
-            
-            cache = new DoppelgangerCache(numLines, cc, dcc, tagArray, dataArray, array, tagRP, dataRP, tmpRP, 
-                accLat, invLat, mshrs, tagLat, mtagLat, mapLat, dataLat, ways, timingCandidates, domain, 
-                name);
         } else if (type == "uniDoppelganger") {
+            RunningStats* rStats = new RunningStats(name);
             uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
-            uint32_t tagLat = config.get<uint32_t>(prefix + "tagLat", 5);
-            uint32_t mtagLat = config.get<uint32_t>(prefix + "mtagLat", 2);
-            uint32_t mapLat = config.get<uint32_t>(prefix + "mapLat", 2);
-            uint32_t dataLat = config.get<uint32_t>(prefix + "dataLat", 2);
             uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
             tagRP->setCC(cc);
             
             cache = new uniDoppelgangerCache(numLines, cc, utagArray, udataArray, array, tagRP, dataRP,
-                accLat, invLat, mshrs, tagLat, mtagLat, mapLat, dataLat, ways, timingCandidates, domain, 
-                name);
+                accLat, invLat, mshrs, ways, timingCandidates, domain, name, rStats);
+            zinfo->runningStats->push_back(rStats);
         } else if (type == "Timing") {
             uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
             uint32_t tagLat = config.get<uint32_t>(prefix + "tagLat", 5);
@@ -915,6 +886,7 @@ void SimInit(const char* configFile, const char* outputDir, uint32_t shmid) {
     zinfo = gm_calloc<GlobSimInfo>();
     zinfo->outputDir = gm_strdup(outputDir);
     zinfo->statsBackends = new g_vector<StatsBackend*>();
+    zinfo->approximateRegions = new g_vector<std::tuple<uint64_t, uint64_t, DataType, DataValue, DataValue>>();
 
     Config config(configFile);
 
