@@ -85,6 +85,7 @@ extern void EndOfPhaseActions(); //in zsim.cpp
 
 BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, uint32_t bankSize, bool isTerminal, uint32_t domain) {
     if (!zinfo->runningStats) zinfo->runningStats = new g_vector<RunningStats*>();
+    if (!zinfo->evictionStats) zinfo->evictionStats = new g_vector<RunningStats*>();
     string type = config.get<const char*>(prefix + "type", "Simple");
     // Shortcut for TraceDriven type
     if (type == "TraceDriven") {
@@ -286,13 +287,15 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             cache = new Cache(numLines, cc, array, rp, accLat, invLat, name);
         } else if (type == "uniDoppelganger") {
             RunningStats* rStats = new RunningStats(name);
+            RunningStats* eStats = new RunningStats(name);
             uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
             uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
             tagRP->setCC(cc);
             
             cache = new uniDoppelgangerCache(numLines, cc, utagArray, udataArray, array, tagRP, dataRP,
-                accLat, invLat, mshrs, ways, timingCandidates, domain, name, rStats);
+                accLat, invLat, mshrs, ways, timingCandidates, domain, name, rStats, eStats);
             zinfo->runningStats->push_back(rStats);
+            zinfo->evictionStats->push_back(eStats);
         } else if (type == "Timing") {
             uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
             uint32_t tagLat = config.get<uint32_t>(prefix + "tagLat", 5);
@@ -887,6 +890,7 @@ void SimInit(const char* configFile, const char* outputDir, uint32_t shmid) {
     zinfo->outputDir = gm_strdup(outputDir);
     zinfo->statsBackends = new g_vector<StatsBackend*>();
     zinfo->approximateRegions = new g_vector<std::tuple<uint64_t, uint64_t, DataType, DataValue, DataValue>>();
+    zinfo->realAddresses = new g_unordered_map<uint64_t, uint64_t>();
 
     Config config(configFile);
 

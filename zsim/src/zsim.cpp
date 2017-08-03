@@ -59,6 +59,7 @@
 #include "stats.h"
 #include "trace_driver.h"
 #include "virt/virt.h"
+#include <float.h>
 
 //#include <signal.h> //can't include this, conflicts with PIN's
 
@@ -530,8 +531,22 @@ uint32_t TakeBarrier(uint32_t tid, uint32_t cid) {
 
 VOID PIN_FAST_ANALYSIS_CALL AllocateApproximateRegion(CONTEXT* cid, ADDRINT regStart, ADDRINT regSize, DataType dataType, DataValue* minValue, DataValue* maxValue)
 {
-    // info("New Approximate Region: %lu, %lu", regStart, regStart+regSize);
+    // info("New Approximate Region: %lu, %lu, %u, %f, %f", regStart, regStart+regSize, dataType, minValue->FLOAT, maxValue->FLOAT);
     zinfo->approximateRegions->push_back(std::make_tuple(regStart, regStart+regSize, dataType, *minValue, *maxValue));
+}
+
+VOID PIN_FAST_ANALYSIS_CALL AllocateDefaultApproximateRegion(CONTEXT* cid, ADDRINT regStart, ADDRINT regSize, DataType dataType)
+{
+    DataValue minValue, maxValue;
+    if (dataType == ZSIM_FLOAT) {
+        minValue.FLOAT = -FLT_MAX;
+        maxValue.FLOAT = FLT_MAX;
+    } else {
+        minValue.DOUBLE = -DBL_MAX;
+        maxValue.DOUBLE = DBL_MAX;
+    }
+    // info("New Approximate Region: %lu, %lu, %u, %f, %f", regStart, regStart+regSize, dataType, minValue.FLOAT, maxValue.FLOAT);
+    zinfo->approximateRegions->push_back(std::make_tuple(regStart, regStart+regSize, dataType, minValue, maxValue));
 }
 
 VOID PIN_FAST_ANALYSIS_CALL ReallocateApproximateRegion(CONTEXT* cid, ADDRINT regStart, ADDRINT regSize)
@@ -570,8 +585,23 @@ VOID Instruction(INS ins) {
     // info("INS: %s", INS_Disassemble(ins).c_str());
     // INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)PrintIp, IARG_THREAD_ID, IARG_REG_VALUE, REG_INST_PTR, IARG_END);
     if(unlikely(zinfo->approximate && INS_Opcode(ins) == XED_ICLASS_NOP && INS_Disassemble(ins) == "nop dword ptr [rax+0x221100ff], eax")) {
+        // info("ALLOC0: %lu: %s", INS_Address(ins), INS_Disassemble(ins).c_str());
+        // info("ALLOC1: %lu: %s", INS_Address(INS_Next(ins)), INS_Disassemble(INS_Next(ins)).c_str());
+        // info("ALLOC2: %lu: %s", INS_Address(INS_Next(INS_Next(ins))), INS_Disassemble(INS_Next(INS_Next(ins))).c_str());
+        // info("ALLOC3: %lu: %s", INS_Address(INS_Next(INS_Next(INS_Next(ins)))), INS_Disassemble(INS_Next(INS_Next(INS_Next(ins)))).c_str());
+        // info("ALLOC4: %lu: %s", INS_Address(INS_Next(INS_Next(INS_Next(INS_Next(ins))))), INS_Disassemble(INS_Next(INS_Next(INS_Next(INS_Next(ins))))).c_str());
+        // info("ALLOC5: %lu: %s", INS_Address(INS_Next(INS_Next(INS_Next(INS_Next(INS_Next((ins))))))), INS_Disassemble(INS_Next(INS_Next(INS_Next(INS_Next(INS_Next((ins))))))).c_str());
         INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR) AllocateApproximateRegion, IARG_FAST_ANALYSIS_CALL, IARG_CONST_CONTEXT, IARG_REG_VALUE, INS_OperandReg(INS_Next(ins), 0), IARG_REG_VALUE, INS_OperandReg(INS_Next(INS_Next(ins)), 0),
         IARG_REG_VALUE, INS_OperandReg(INS_Next(INS_Next(INS_Next(ins))), 0), IARG_REG_VALUE, INS_OperandReg(INS_Next(INS_Next(INS_Next(INS_Next(ins)))), 0), IARG_REG_VALUE, INS_OperandReg(INS_Next(INS_Next(INS_Next(INS_Next(INS_Next(ins))))), 0), IARG_END);
+    } else if(unlikely(zinfo->approximate && INS_Opcode(ins) == XED_ICLASS_NOP && INS_Disassemble(ins) == "nop dword ptr [rax+0x551100ff], eax")) {
+        // info("ALLOC0: %lu: %s", INS_Address(ins), INS_Disassemble(ins).c_str());
+        // info("ALLOC1: %lu: %s", INS_Address(INS_Next(ins)), INS_Disassemble(INS_Next(ins)).c_str());
+        // info("ALLOC2: %lu: %s", INS_Address(INS_Next(INS_Next(ins))), INS_Disassemble(INS_Next(INS_Next(ins))).c_str());
+        // info("ALLOC3: %lu: %s", INS_Address(INS_Next(INS_Next(INS_Next(ins)))), INS_Disassemble(INS_Next(INS_Next(INS_Next(ins)))).c_str());
+        // info("ALLOC4: %lu: %s", INS_Address(INS_Next(INS_Next(INS_Next(INS_Next(ins))))), INS_Disassemble(INS_Next(INS_Next(INS_Next(INS_Next(ins))))).c_str());
+        // info("ALLOC5: %lu: %s", INS_Address(INS_Next(INS_Next(INS_Next(INS_Next(INS_Next((ins))))))), INS_Disassemble(INS_Next(INS_Next(INS_Next(INS_Next(INS_Next((ins))))))).c_str());
+        INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR) AllocateDefaultApproximateRegion, IARG_FAST_ANALYSIS_CALL, IARG_CONST_CONTEXT, IARG_REG_VALUE, INS_OperandReg(INS_Next(ins), 0), IARG_REG_VALUE, INS_OperandReg(INS_Next(INS_Next(ins)), 0),
+        IARG_REG_VALUE, INS_OperandReg(INS_Next(INS_Next(INS_Next(ins))), 0), IARG_END);
     } else if(unlikely(zinfo->approximate && INS_Opcode(ins) == XED_ICLASS_NOP && INS_Disassemble(ins) == "nop dword ptr [rax+0x331100ff], eax")) {
         INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR) ReallocateApproximateRegion, IARG_FAST_ANALYSIS_CALL, IARG_CONST_CONTEXT, IARG_REG_VALUE, INS_OperandReg(INS_Next(ins), 0), IARG_REG_VALUE, INS_OperandReg(INS_Next(INS_Next(ins)), 0), IARG_END);
     } else if(unlikely(zinfo->approximate && INS_Opcode(ins) == XED_ICLASS_NOP && INS_Disassemble(ins) == "nop dword ptr [rax+0x441100ff], eax")) {
@@ -1164,6 +1194,7 @@ VOID SimEnd() {
 
         if (zinfo->sched) zinfo->sched->notifyTermination();
         for(uint32_t i = 0; i < zinfo->runningStats->size(); i++) (*zinfo->runningStats)[i]->dump();
+        for(uint32_t i = 0; i < zinfo->evictionStats->size(); i++) (*zinfo->evictionStats)[i]->dump();
     }
 
     //Uncomment when debugging termination races, which can be rare because they are triggered by threads of a dying process

@@ -6,9 +6,9 @@
 
 uniDoppelgangerCache::uniDoppelgangerCache(uint32_t _numLines, CC* _cc, uniDoppelgangerTagArray* _tagArray, 
 uniDoppelgangerDataArray* _dataArray, CacheArray* _array, ReplPolicy* tagRP, ReplPolicy* dataRP, uint32_t _accLat, uint32_t _invLat, 
-uint32_t mshrs, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name, RunningStats* _rStats) : TimingCache(_numLines, 
+uint32_t mshrs, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name, RunningStats* _rStats, RunningStats* _eStats) : TimingCache(_numLines, 
 _cc, _array, tagRP, _accLat, _invLat, mshrs, tagLat, ways, cands, _domain, _name), tagArray(_tagArray), dataArray(_dataArray), 
-tagRP(tagRP), dataRP(dataRP), rStats(_rStats) {}
+tagRP(tagRP), dataRP(dataRP), rStats(_rStats), eStats(_eStats) {}
 
 void uniDoppelgangerCache::initCacheStats(AggregateStat* cacheStat) {
     cc->initStats(cacheStat);
@@ -24,8 +24,13 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
     DataType type = ZSIM_FLOAT;
     DataValue min, max;
     bool approximate = false;
+    uint64_t Evictions = 0;
+    uint64_t readAddress = req.lineAddr;
+    if (zinfo->realAddresses->find(req.lineAddr) != zinfo->realAddresses->end())
+        readAddress = (*zinfo->realAddresses)[req.lineAddr];
     for(uint32_t i = 0; i < zinfo->approximateRegions->size(); i++) {
-        if ((req.lineAddr << lineBits) > std::get<0>((*zinfo->approximateRegions)[i]) && (req.lineAddr << lineBits) < std::get<1>((*zinfo->approximateRegions)[i])) {
+        if ((readAddress << lineBits) >= std::get<0>((*zinfo->approximateRegions)[i]) && (readAddress << lineBits) <= std::get<1>((*zinfo->approximateRegions)[i])
+        && (readAddress << lineBits)+zinfo->lineSize-1 >= std::get<0>((*zinfo->approximateRegions)[i]) && (readAddress << lineBits)+zinfo->lineSize-1 <= std::get<1>((*zinfo->approximateRegions)[i])) {
             type = std::get<2>((*zinfo->approximateRegions)[i]);
             min = std::get<3>((*zinfo->approximateRegions)[i]);
             max = std::get<4>((*zinfo->approximateRegions)[i]);
@@ -34,7 +39,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
         }
     }
     if (approximate)
-        PIN_SafeCopy(data, (void*)(req.lineAddr << lineBits), zinfo->lineSize);
+        PIN_SafeCopy(data, (void*)(readAddress << lineBits), zinfo->lineSize);
     
     EventRecorder* evRec = zinfo->eventRecorders[req.srcId];
     assert_msg(evRec, "DoppelgangerCache is not connected to TimingCore");
@@ -128,6 +133,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                     dataArray->postinsert(victimMap, &req, victimDataId, newLLHead, approximateVictim, false);
                 }
                 if (evRec->hasRecord()) {
+                    Evictions++;
                     tagWritebackRecord.clear();
                     tagWritebackRecord = evRec->popRecord();
                 }
@@ -189,6 +195,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                         tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
                         victimListHeadId = tagArray->readNextLL(victimListHeadId);
                         if (evRec->hasRecord()) {
+                            Evictions++;
                             writebackRecord.clear();
                             writebackRecord = evRec->popRecord();
                             writebackRecords.push_back(writebackRecord);
@@ -263,6 +270,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                     dataArray->postinsert(victimMap, &req, victimDataId, newLLHead, approximateVictim, false);
                 }
                 if (evRec->hasRecord()) {
+                    Evictions++;
                     tagWritebackRecord.clear();
                     tagWritebackRecord = evRec->popRecord();
                 }
@@ -292,6 +300,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                         tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
                         victimListHeadId = tagArray->readNextLL(victimListHeadId);
                         if (evRec->hasRecord()) {
+                            Evictions++;
                             writebackRecord.clear();
                             writebackRecord = evRec->popRecord();
                             writebackRecords.push_back(writebackRecord);
@@ -418,6 +427,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                             }
                             victimListHeadId = tagArray->readNextLL(victimListHeadId);
                             if (evRec->hasRecord()) {
+                                Evictions++;
                                 writebackRecord.clear();
                                 writebackRecord = evRec->popRecord();
                                 writebackRecords.push_back(writebackRecord);
@@ -502,6 +512,11 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
     // info("Valid Liness: %u", dataArray->getValidLines());
     double sample = (double)dataArray->getValidLines()/(double)tagArray->getValidLines();
     rStats->add(sample,1);
+
+    if (req.type != PUTS) {
+        sample = Evictions;
+        eStats->add(sample,1);
+    }
 
     assert_msg(respCycle >= req.cycle, "[%s] resp < req? 0x%lx type %s childState %s, respCycle %ld reqCycle %ld",
             name.c_str(), req.lineAddr, AccessTypeName(req.type), MESIStateName(*req.state), respCycle, req.cycle);

@@ -4,7 +4,7 @@
 JDK_PATH=$(shell dirname $(shell dirname $(shell (readlink -f `which javac`))))
 
 # Common deps
-DEPS=Makefile zsim_hooks.h zsim_malloc.h zsim_new.cpp zsim_malloc.c
+DEPS=Makefile zsim_hooks.h zsim_malloc.h zsim_new.cpp
 
 default: test_c test_cpp test_fortran test.class
 

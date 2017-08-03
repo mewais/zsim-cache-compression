@@ -60,5 +60,5 @@ void RunningStats::combineWith(const RunningStats &rhs) throw () {
 }
 
 void RunningStats::dump() {
-    info("%s RunningStats: %f, %f, %f, %f", this->name.c_str(), this->getMin(), this->getMax(), this->getMean(), this->getStdDev());
+    info("%s RunningStats: %f, %f, %f, %f", this->name.c_str(), this->getMin(), this->getMean(), this->getMax(), this->getStdDev());
 }

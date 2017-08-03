@@ -129,6 +129,7 @@ class FilterCache : public Cache {
             Address pLineAddr = procMask | vLineAddr;
             MESIState dummyState = MESIState::I;
             futex_lock(&filterLock);
+            (*zinfo->realAddresses)[pLineAddr] = vLineAddr;
             MemReq req = {pLineAddr, isLoad? GETS : GETX, 0, &dummyState, curCycle, &filterLock, dummyState, srcId, reqFlags};
             uint64_t respCycle  = access(req);
 

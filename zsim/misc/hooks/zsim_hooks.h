@@ -78,11 +78,29 @@ typedef union
 
 static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, DataType Type)
 {
-    // printf("[" HOOKS_STR "] Approximate Allocation\n");
-    DataValue Min;
-    DataValue Max;
-    Min.HOOKS_FLOAT = -FLT_MAX;
-    Max.HOOKS_FLOAT = FLT_MAX;
+    // printf("[" HOOKS_STR "] Approximate Allocation1\n");
+    DataValue* minValue = malloc(sizeof(DataValue));
+    DataValue* maxValue = malloc(sizeof(DataValue));
+    if (Type == HOOKS_DOUBLE)
+    {
+        minValue->HOOKS_DOUBLE = -29.39215;
+        maxValue->HOOKS_DOUBLE = 1.0000001e+100;
+    }
+    else
+    {
+        minValue->HOOKS_FLOAT = -29.39215;
+	    maxValue->HOOKS_FLOAT = 1.0000001e+100;
+    }
+    // __asm__ __volatile__
+    // (
+    //     ".byte 0x0F, 0x1F, 0x80, 0xFF, 0x00, 0x11, 0x55 ;\n\t"
+    //     "add %3, %0 ;\n\t"
+    //     "add %3, %1 ;\n\t"
+    //     "add %3, %2 ;\n\t"
+    //     :
+    //     : "r" ((uint64_t)Start), "r" (ByteLength), "r" (Type), "i" (0)
+    //     :
+    // );
     __asm__ __volatile__
     (
         ".byte 0x0F, 0x1F, 0x80, 0xFF, 0x00, 0x11, 0x22 ;\n\t"
@@ -92,14 +110,14 @@ static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, D
         "add %5, %3 ;\n\t"
         "add %5, %4 ;\n\t"
         :
-        : "r" ((uint64_t)Start), "r" (ByteLength), "r" (Type), "r" ((uint64_t)&Min), "r" ((uint64_t)&Max), "i" (0)
+        : "r" ((uint64_t)Start), "r" (ByteLength), "r" (Type), "r" ((uint64_t)minValue), "r" ((uint64_t)maxValue), "i" (0)
         :
     );
 }
 
-static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, DataType Type, DataValue* Min, DataValue* Max)
+static inline void zsim_elaborate_allocate_approximate(void* Start, uint64_t ByteLength, DataType Type, DataValue* Min, DataValue* Max)
 {
-    // printf("[" HOOKS_STR "] Approximate Allocation\n");
+    // printf("[" HOOKS_STR "] Approximate Allocation2\n");
     __asm__ __volatile__
     (
         ".byte 0x0F, 0x1F, 0x80, 0xFF, 0x00, 0x11, 0x22 ;\n\t"
@@ -122,7 +140,6 @@ static inline void zsim_reallocate_approximate(void* Start, uint64_t ByteLength)
         ".byte 0x0F, 0x1F, 0x80, 0xFF, 0x00, 0x11, 0x33 ;\n\t"
         "add %2, %0 ;\n\t"
         "add %2, %1 ;\n\t"
-        "add %2"
         :
         : "r" ((uint64_t)Start), "r" (ByteLength), "i" (0)
         :

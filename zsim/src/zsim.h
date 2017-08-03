@@ -33,6 +33,7 @@
 #include "locks.h"
 #include "pad.h"
 #include "memory_hierarchy.h"
+#include "g_std/g_unordered_map.h"
 
 #include <tuple>
 
@@ -141,6 +142,7 @@ struct GlobSimInfo {
     AggregateStat* rootStat;
     g_vector<StatsBackend*>* statsBackends; // used for termination dumps
     g_vector<RunningStats*>* runningStats;
+    g_vector<RunningStats*>* evictionStats;
     StatsBackend* periodicStatsBackend;
     StatsBackend* eventualStatsBackend;
     ProcessStats* processStats;
@@ -191,6 +193,7 @@ struct GlobSimInfo {
     bool approximate;
     // start, end, type, min, max
     g_vector<std::tuple<uint64_t, uint64_t, DataType, DataValue, DataValue>>* approximateRegions;
+    g_unordered_map<uint64_t, uint64_t>* realAddresses;
 };
 
 
