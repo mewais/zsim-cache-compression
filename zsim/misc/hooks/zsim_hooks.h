@@ -79,17 +79,17 @@ typedef union
 static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, DataType Type)
 {
     // printf("[" HOOKS_STR "] Approximate Allocation1\n");
-    DataValue* minValue = malloc(sizeof(DataValue));
-    DataValue* maxValue = malloc(sizeof(DataValue));
+    DataValue* minValue = (DataValue*) malloc(sizeof(DataValue));
+    DataValue* maxValue = (DataValue*) malloc(sizeof(DataValue));
     if (Type == HOOKS_DOUBLE)
     {
-        minValue->HOOKS_DOUBLE = -29.39215;
-        maxValue->HOOKS_DOUBLE = 1.0000001e+100;
+        minValue->HOOKS_DOUBLE = -512;
+        maxValue->HOOKS_DOUBLE = 512;
     }
     else
     {
-        minValue->HOOKS_FLOAT = -29.39215;
-	    maxValue->HOOKS_FLOAT = 1.0000001e+100;
+        minValue->HOOKS_FLOAT = -512;
+	    maxValue->HOOKS_FLOAT = 512;
     }
     // __asm__ __volatile__
     // (

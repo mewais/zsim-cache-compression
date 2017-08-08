@@ -53,6 +53,7 @@ class CacheArray : public GlobAlloc {
 
 class ReplPolicy;
 class HashFamily;
+class H3HashFamily;
 
 /* Set-associative cache array */
 class SetAssocArray : public CacheArray {
@@ -77,7 +78,7 @@ class SetAssocArray : public CacheArray {
 // uniDoppelganger Start
 class uniDoppelgangerTagArray {
     protected:
-        bool* approximate;
+        bool* approximateArray;
         Address* tagArray;
         int32_t* prevPointerArray;
         int32_t* nextPointerArray;
@@ -88,7 +89,6 @@ class uniDoppelgangerTagArray {
         uint32_t numSets;
         uint32_t assoc;
         uint32_t setMask;
-
         uint32_t validLines;
 
     public:
@@ -98,11 +98,12 @@ class uniDoppelgangerTagArray {
         int32_t lookup(Address lineAddr, const MemReq* req, bool updateReplacement);
         // Returns candidate Index for insertion, wbLineAddr will point to its address for eviction.
         int32_t preinsert(Address lineAddr, const MemReq* req, Address* wbLineAddr);
-        // returns a true if we should evict the associated map/data line. newLLHead is the Index of the new 
+        // returns a true if we should evict the associated map/data line. newLLHead is the Index of the new
         // LinkedList Head to pointed to from the data array.
         bool evictAssociatedData(int32_t lineId, int32_t* newLLHead, bool* approximate);
         // Actually inserts
         void postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t mapId, int32_t listHead, bool approximate, bool updateReplacement);
+        void changeInPlace(Address lineAddr, const MemReq* req, int32_t tagId, int32_t mapId, int32_t listHead, bool approximate, bool updateReplacement);
         // returns mapId
         int32_t readMapId(int32_t tagId);
         // returns dataId
@@ -118,7 +119,7 @@ class uniDoppelgangerTagArray {
 
 class uniDoppelgangerDataArray {
     protected:
-        bool* approximate;
+        bool* approximateArray;
         int32_t* mtagArray;
         int32_t* tagPointerArray;
         ReplPolicy* rp;
@@ -127,7 +128,6 @@ class uniDoppelgangerDataArray {
         uint32_t numSets;
         uint32_t assoc;
         uint32_t setMask;
-
         uint32_t validLines;
 
     public:
@@ -141,16 +141,304 @@ class uniDoppelgangerDataArray {
         int32_t preinsert(uint32_t map, const MemReq* req, int32_t* tagId);
         // Actually inserts
         void postinsert(int32_t map, const MemReq* req, int32_t mapId, int32_t tagId, bool approximate, bool updateReplacement);
+        void changeInPlace(int32_t map, const MemReq* req, int32_t mapId, int32_t tagId, bool approximate, bool updateReplacement);
         // returns tagId
         int32_t readListHead(int32_t mapId);
         // returns map
         int32_t readMap(int32_t mapId);
-
         uint32_t getValidLines();
         void initStats(AggregateStat* parent) {}
         void print();
 };
 // uniDoppelganger End
+
+// BDI Begin
+class ApproximateBDITagArray {
+    protected:
+        bool* approximateArray;
+        Address* tagArray;
+        int32_t* segmentPointerArray;    // NOTE: doesn't actually reflect segmentPointer. It's just valid or invalid.
+        BDICompressionEncoding* compressionEncodingArray;
+        ReplPolicy* rp;
+        HashFamily* hf;
+        uint32_t numLines;
+        uint32_t numSets;
+        uint32_t assoc;
+        uint32_t dataAssoc;
+        uint32_t setMask;
+        uint32_t validLines;
+        uint32_t dataValidSegments;
+    public:
+        ApproximateBDITagArray(uint32_t _numLines, uint32_t _assoc, uint32_t _dataAssoc, ReplPolicy* _rp, HashFamily* _hf);
+        ~ApproximateBDITagArray();
+        // Returns the Index of the matching tag, or -1 if none found.
+        int32_t lookup(Address lineAddr, const MemReq* req, bool updateReplacement);
+        // Returns candidate Index for insertion, wbLineAddr will point to its address for eviction.
+        int32_t preinsert(Address lineAddr, const MemReq* req, Address* wbLineAddr);
+        // Returns candidate Index for insertion, wbLineAddr will point to its address for eviction, or -1 if none needed.
+        int32_t needEviction(Address lineAddr, const MemReq* req, uint16_t size, g_vector<uint32_t>& alreadyEvicted, Address* wbLineAddr);
+        // Actually inserts
+        void postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int8_t segmentId, BDICompressionEncoding compression, bool approximate, bool updateReplacement);
+        // returns compressionEncoding
+        BDICompressionEncoding readCompressionEncoding(int32_t tagId);
+        void writeCompressionEncoding(int32_t tagId, BDICompressionEncoding encoding);
+        // returns segmentPointer
+        int8_t readSegmentPointer(int32_t tagId);
+        uint32_t getValidLines();
+        uint32_t getDataValidSegments();
+        void initStats(AggregateStat* parent) {}
+        void print();
+};
+
+class ApproximateBDIDataArray {
+    protected:
+        uint64_t my_llabs(int64_t x);
+        uint8_t multiBaseCompression(uint64_t* values, uint8_t size, uint8_t blimit, uint8_t bsize);
+    public:
+        // We can also generate bit masks here, but it will not affect the timing.
+        BDICompressionEncoding compress(const DataLine data, uint16_t* size);
+        void approximate(const DataLine data, DataType type);
+};
+// BDI Begin
+
+// Dedup Begin
+// This in fact is exactly the same as uniDoppelgangerTagArray
+class ApproximateDedupTagArray {
+    protected:
+        bool* approximateArray;
+        Address* tagArray;
+        int32_t* prevPointerArray;
+        int32_t* nextPointerArray;
+        int32_t* dataPointerArray;
+        ReplPolicy* rp;
+        HashFamily* hf;
+        uint32_t numLines;
+        uint32_t numSets;
+        uint32_t assoc;
+        uint32_t setMask;
+        uint32_t validLines;
+
+    public:
+        ApproximateDedupTagArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
+        ~ApproximateDedupTagArray();
+        // Returns the Index of the matching tag, or -1 if none found.
+        int32_t lookup(Address lineAddr, const MemReq* req, bool updateReplacement);
+        // Returns candidate Index for insertion, wbLineAddr will point to its address for eviction.
+        int32_t preinsert(Address lineAddr, const MemReq* req, Address* wbLineAddr);
+        // returns a true if we should evict the associated map/data line. newLLHead is the Index of the new
+        // LinkedList Head to pointed to from the data array.
+        bool evictAssociatedData(int32_t lineId, int32_t* newLLHead, bool* approximate);
+        // Actually inserts
+        void postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t listHead, bool approximate, bool updateReplacement);
+        void changeInPlace(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t listHead, bool approximate, bool updateReplacement);
+        // returns dataId
+        int32_t readDataId(int32_t tagId);
+        // returns address
+        Address readAddress(int32_t tagId);
+        // returns next tagID in LL
+        int32_t readNextLL(int32_t tagId);
+        // returns next tagID in LL
+        int32_t readPrevLL(int32_t tagId);
+        uint32_t getValidLines();
+        void initStats(AggregateStat* parent) {}
+        void print();
+};
+
+class ApproximateDedupDataArray {
+    protected:
+        bool* approximateArray;
+        int32_t* tagCounterArray;
+        int32_t* tagPointerArray;
+        DataLine* dataArray;
+        ReplPolicy* rp;
+        HashFamily* hf;
+        uint32_t numLines;
+        uint32_t numSets;
+        uint32_t assoc;
+        uint32_t setMask;
+        uint32_t validLines;
+
+    public:
+        ApproximateDedupDataArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
+        ~ApproximateDedupDataArray();
+        void lookup(int32_t dataId, const MemReq* req, bool updateReplacement);
+        int32_t preinsert(int32_t* tagPointer);
+        // Actually inserts
+        void postinsert(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, bool approximate, DataLine data, bool updateReplacement);
+        void changeInPlace(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, bool approximate, DataLine data, bool updateReplacement);
+        void writeData(int32_t dataId, DataLine data, const MemReq* req, bool updateReplacement);
+        bool isSame(int32_t dataId, DataLine data);
+        // returns tagId
+        int32_t readListHead(int32_t dataId);
+        // returns counter
+        int32_t readCounter(int32_t dataId);
+        DataLine readData(int32_t dataId);
+        uint32_t getValidLines();
+        void initStats(AggregateStat* parent) {}
+        void print();
+};
+
+class ApproximateDedupHashArray {
+    protected:
+        uint64_t* hashArray;
+        int32_t* dataPointerArray;
+        ReplPolicy* rp;
+        HashFamily* hf;
+        H3HashFamily* dataHash;
+        uint32_t numLines;
+        uint32_t numSets;
+        uint32_t assoc;
+        uint32_t setMask;
+    public:
+        ApproximateDedupHashArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf, H3HashFamily* _dataHash);
+        ~ApproximateDedupHashArray();
+        int32_t lookup(uint64_t hash, const MemReq* req, bool updateReplacement);
+        int32_t preinsert(uint64_t hash, const MemReq* req);
+        void postinsert(uint64_t hash, const MemReq* req, int32_t dataPointer, int32_t hashId, bool updateReplacement);
+        int32_t readDataPointer(int32_t hashId);
+        void approximate(const DataLine data, DataType type);
+        uint64_t hash(const DataLine data);
+        void print();
+};
+// Dedup End
+
+// Dedup BDI Begin
+class ApproximateDedupBDITagArray {
+    protected:
+        Address* tagArray;
+        int32_t* segmentPointerArray;
+        int32_t* prevPointerArray;
+        int32_t* nextPointerArray;
+        int32_t* dataPointerArray;
+        BDICompressionEncoding* compressionEncodingArray;
+        ReplPolicy* rp;
+        HashFamily* hf;
+        uint32_t numLines;
+        uint32_t numSets;
+        uint32_t assoc;
+        uint32_t setMask;
+        uint32_t validLines;
+        uint32_t dataValidSegments;
+    public:
+        ApproximateDedupBDITagArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
+        ~ApproximateDedupBDITagArray();
+        // Returns the Index of the matching tag, or -1 if none found.
+        int32_t lookup(Address lineAddr, const MemReq* req, bool updateReplacement);
+        // Returns candidate Index for insertion, wbLineAddr will point to its address for eviction.
+        int32_t preinsert(Address lineAddr, const MemReq* req, Address* wbLineAddr);
+        // returns a true if we should evict the associated map/data line. newLLHead is the Index of the new
+        // LinkedList Head to pointed to from the data array.
+        bool evictAssociatedData(int32_t lineId, int32_t* newLLHead);
+        // Actually inserts
+        void postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t segmentId, BDICompressionEncoding encoding, int32_t listHead, bool updateReplacement);
+        void changeInPlace(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t segmentId, BDICompressionEncoding encoding, int32_t listHead, bool updateReplacement);
+        // returns compressionEncoding
+        BDICompressionEncoding readCompressionEncoding(int32_t tagId);
+        void writeCompressionEncoding(int32_t tagId, BDICompressionEncoding encoding);
+        // returns segmentPointer
+        int32_t readSegmentPointer(int32_t tagId);
+        // returns mapId
+        int32_t readMapId(int32_t tagId);
+        // returns dataId
+        int32_t readDataId(int32_t tagId);
+        // returns address
+        Address readAddress(int32_t tagId);
+        // returns next tagID in LL
+        int32_t readNextLL(int32_t tagId);
+        int32_t readPrevLL(int32_t tagId);
+        uint32_t getValidLines();
+        uint32_t getDataValidSegments();
+        void initStats(AggregateStat* parent) {}
+        void print();
+};
+
+class ApproximateDedupBDIDataArray : public ApproximateBDIDataArray {
+    protected:
+        int32_t** tagCounterArray;
+        int32_t** tagPointerArray;
+        DataLine** compressedDataArray;
+        HashFamily* hf;
+        uint32_t numLines;
+        uint32_t numSets;
+        uint32_t assoc;
+        uint32_t setMask;
+        uint32_t validLines;
+
+    public:
+        ApproximateDedupBDIDataArray(uint32_t _numLines, uint32_t _assoc, HashFamily* _hf);
+        ~ApproximateDedupBDIDataArray();
+        void lookup(int32_t dataId, const MemReq* req, bool updateReplacement);
+        int32_t preinsert();
+        int32_t preinsert(int32_t dataId, int32_t* tagId, g_vector<uint32_t>& exceptions);
+        // Actually inserts
+        void postinsert(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, int32_t segmentId, DataLine data);
+        void writeData(int32_t dataId, int32_t segmentId, DataLine data, const MemReq* req, bool updateReplacement);
+        bool isSame(int32_t dataId, int32_t segmentId, DataLine data);
+        // returns tagId
+        int32_t readListHead(int32_t dataId, int32_t segmentId);
+        // returns counter
+        int32_t readCounter(int32_t dataId, int32_t segmentId);
+        DataLine readData(int32_t dataId, int32_t segmentId);
+        uint32_t getValidLines();
+        void initStats(AggregateStat* parent) {}
+        uint32_t getAssoc() {return assoc;}
+        void print();
+};
+
+class ApproximateDedupBDIHashArray {
+    protected:
+        uint64_t* hashArray;
+        int32_t* dataPointerArray;
+        int32_t* segmentPointerArray;
+        ReplPolicy* rp;
+        HashFamily* hf;
+        H3HashFamily* dataHash;
+        uint32_t numLines;
+        uint32_t numSets;
+        uint32_t assoc;
+        uint32_t setMask;
+    public:
+        ApproximateDedupBDIHashArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf, H3HashFamily* _dataHash);
+        ~ApproximateDedupBDIHashArray();
+        int32_t lookup(uint64_t hash, const MemReq* req, bool updateReplacement);
+        int32_t preinsert(uint64_t hash, const MemReq* req);
+        void postinsert(uint64_t hash, const MemReq* req, int32_t dataPointer, int32_t segmentPointer, int32_t hashId, bool updateReplacement);
+        int32_t readDataPointer(int32_t hashId);
+        int32_t readSegmentPointer(int32_t hashId);
+        void approximate(const DataLine data, DataType type);
+        uint64_t hash(const DataLine data);
+        void print();
+};
+// class DedupApproximateBDIDataArray {
+//     protected:
+//         bool* approximateArray;
+//         int32_t* tagPointerArray;
+//         uint32_t* counterArray;
+//         ReplPolicy* rp;
+//         HashFamily* hf;
+//         uint32_t numLines;
+//         uint32_t validLines;
+
+//     public:
+//         DedupApproximateBDIDataArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
+//         ~DedupApproximateBDIDataArray();
+//         // Returns the Index of the matching map, Must find.
+//         int32_t lookup(uint32_t map, const MemReq* req, bool updateReplacement);
+//         // Return the map of this data line
+//         uint32_t calculateMap(const DataLine data, DataType type, DataValue minValue, DataValue maxValue);
+//         // Returns candidate ID for insertion, tagID will point to a tag list head that need to be evicted.
+//         int32_t preinsert(uint32_t map, const MemReq* req, int32_t* tagId);
+//         // Actually inserts
+//         void postinsert(int32_t map, const MemReq* req, int32_t mapId, int32_t tagId, bool approximate, bool updateReplacement);
+//         // returns tagId
+//         int32_t readListHead(int32_t mapId);
+//         // returns map
+//         int32_t readMap(int32_t mapId);
+//         uint32_t getValidLines();
+//         void initStats(AggregateStat* parent) {}
+//         void print();
+// };
+// BDI End
 
 /* The cache array that started this simulator :) */
 class ZArray : public CacheArray {

@@ -1193,8 +1193,10 @@ VOID SimEnd() {
         for (AccessTraceWriter* t : *(zinfo->traceWriters)) t->dump(false);  // flushes trace writer
 
         if (zinfo->sched) zinfo->sched->notifyTermination();
-        for(uint32_t i = 0; i < zinfo->runningStats->size(); i++) (*zinfo->runningStats)[i]->dump();
+        for(uint32_t i = 0; i < zinfo->compressionRatioStats->size(); i++) (*zinfo->compressionRatioStats)[i]->dump();
         for(uint32_t i = 0; i < zinfo->evictionStats->size(); i++) (*zinfo->evictionStats)[i]->dump();
+        for(uint32_t i = 0; i < zinfo->tagUtilizationStats->size(); i++) (*zinfo->tagUtilizationStats)[i]->dump();
+        for(uint32_t i = 0; i < zinfo->dataUtilizationStats->size(); i++) (*zinfo->dataUtilizationStats)[i]->dump();
     }
 
     //Uncomment when debugging termination races, which can be rare because they are triggered by threads of a dying process

@@ -30,6 +30,9 @@
 #include "repl_policies.h"
 #include "zsim.h"
 
+#include "pin.H"
+#include <cstdlib>
+#include <time.h>
 /* Set-associative array implementation */
 
 SetAssocArray::SetAssocArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf) : rp(_rp), hf(_hf), numLines(_numLines), assoc(_assoc)  {
@@ -73,7 +76,7 @@ uniDoppelgangerTagArray::uniDoppelgangerTagArray(uint32_t _numLines, uint32_t _a
     prevPointerArray = gm_calloc<int32_t>(numLines);
     nextPointerArray = gm_calloc<int32_t>(numLines);
     mapPointerArray = gm_calloc<int32_t>(numLines);
-    approximate = gm_calloc<bool>(numLines);
+    approximateArray = gm_calloc<bool>(numLines);
     for (uint32_t i = 0; i < numLines; i++) {
         prevPointerArray[i] = -1;
         nextPointerArray[i] = -1;
@@ -90,7 +93,7 @@ uniDoppelgangerTagArray::~uniDoppelgangerTagArray() {
     gm_free(prevPointerArray);
     gm_free(nextPointerArray);
     gm_free(mapPointerArray);
-    gm_free(approximate);
+    gm_free(approximateArray);
 }
 
 int32_t uniDoppelgangerTagArray::lookup(Address lineAddr, const MemReq* req, bool updateReplacement) {
@@ -119,7 +122,7 @@ bool uniDoppelgangerTagArray::evictAssociatedData(int32_t lineId, int32_t* newLL
     *newLLHead = -1;
     if (mapPointerArray[lineId] == -1)
         return false;
-    if (!this->approximate[lineId])
+    if (!approximateArray[lineId])
         return true;
     *approximate = true;
     if (prevPointerArray[lineId] != -1)
@@ -140,7 +143,7 @@ void uniDoppelgangerTagArray::postinsert(Address lineAddr, const MemReq* req, in
     rp->replaced(tagId);
     tagArray[tagId] = lineAddr;
     mapPointerArray[tagId] = mapId;
-    this->approximate[tagId] = approximate;
+    approximateArray[tagId] = approximate;
     if (prevPointerArray[tagId] != -1)
         nextPointerArray[prevPointerArray[tagId]] = nextPointerArray[tagId];
     if (nextPointerArray[tagId] != -1)
@@ -151,7 +154,30 @@ void uniDoppelgangerTagArray::postinsert(Address lineAddr, const MemReq* req, in
         if(prevPointerArray[listHead] == -1) prevPointerArray[listHead] = tagId;
         else panic("List head is not actually a list head!");
     }
-    if(updateReplacement) rp->update(mapId, req);
+    if(updateReplacement) rp->update(tagId, req);
+}
+
+void uniDoppelgangerTagArray::changeInPlace(Address lineAddr, const MemReq* req, int32_t tagId, int32_t mapId, int32_t listHead, bool approximate, bool updateReplacement) {
+    // if (!tagArray[tagId] && lineAddr) {
+    //     validLines++;
+    // } else if (tagArray[tagId] && !lineAddr) {
+    //     validLines--;
+    // }
+    // rp->replaced(tagId);
+    tagArray[tagId] = lineAddr;
+    mapPointerArray[tagId] = mapId;
+    approximateArray[tagId] = approximate;
+    if (prevPointerArray[tagId] != -1)
+        nextPointerArray[prevPointerArray[tagId]] = nextPointerArray[tagId];
+    if (nextPointerArray[tagId] != -1)
+        prevPointerArray[nextPointerArray[tagId]] = prevPointerArray[tagId];
+    prevPointerArray[tagId] = -1;
+    nextPointerArray[tagId] = listHead;
+    if (listHead >= 0) {
+        if(prevPointerArray[listHead] == -1) prevPointerArray[listHead] = tagId;
+        else panic("List head is not actually a list head!");
+    }
+    if(updateReplacement) rp->update(tagId, req);
 }
 
 int32_t uniDoppelgangerTagArray::readMapId(const int32_t tagId) {
@@ -179,14 +205,14 @@ uint32_t uniDoppelgangerTagArray::getValidLines() {
 void uniDoppelgangerTagArray::print() {
     for (uint32_t i = 0; i < this->numLines; i++) {
         if (mapPointerArray[i] != -1)
-            info("%i: %lu, %i, %i, %i, %s", i, tagArray[i] << lineBits, prevPointerArray[i], nextPointerArray[i], mapPointerArray[i], approximate[i]? "approximate":"exact");
+            info("%i: %lu, %i, %i, %i, %s", i, tagArray[i] << lineBits, prevPointerArray[i], nextPointerArray[i], mapPointerArray[i], approximateArray[i]? "approximate":"exact");
     }
 }
 
 uniDoppelgangerDataArray::uniDoppelgangerDataArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf) : rp(_rp), hf(_hf), numLines(_numLines), assoc(_assoc)  {
     mtagArray = gm_calloc<int32_t>(numLines);
     tagPointerArray = gm_calloc<int32_t>(numLines);
-    approximate = gm_calloc<bool>(numLines);
+    approximateArray = gm_calloc<bool>(numLines);
     for (uint32_t i = 0; i < numLines; i++) {
         tagPointerArray[i] = -1;
         mtagArray[i] = -1;
@@ -200,14 +226,14 @@ uniDoppelgangerDataArray::uniDoppelgangerDataArray(uint32_t _numLines, uint32_t 
 uniDoppelgangerDataArray::~uniDoppelgangerDataArray() {
     gm_free(mtagArray);
     gm_free(tagPointerArray);
-    gm_free(approximate);
+    gm_free(approximateArray);
 }
 
 int32_t uniDoppelgangerDataArray::lookup(uint32_t map, const MemReq* req, bool updateReplacement) {
     uint32_t set = hf->hash(0, map) & setMask;
     uint32_t first = set*assoc;
     for (uint32_t id = first; id < first + assoc; id++) {
-        if (mtagArray[id] == (int32_t)map && approximate[id] == true) {
+        if (mtagArray[id] == (int32_t)map && approximateArray[id] == true) {
             if (updateReplacement) rp->update(id, req);
             return id;
         }
@@ -219,7 +245,7 @@ uint32_t uniDoppelgangerDataArray::calculateMap(const DataLine data, DataType ty
     // Get hash and map values
     int64_t intAvgHash = 0, intRangeHash = 0;
     double floatAvgHash = 0, floatRangeHash = 0;
-    int64_t intMax = std::numeric_limits<int64_t>::min(), 
+    int64_t intMax = std::numeric_limits<int64_t>::min(),
             intMin = std::numeric_limits<int64_t>::max(),
             intSum = 0;
     double floatMax = std::numeric_limits<double>::min(),
@@ -459,7 +485,14 @@ void uniDoppelgangerDataArray::postinsert(int32_t map, const MemReq* req, int32_
     rp->replaced(mapId);
     mtagArray[mapId] = map;
     tagPointerArray[mapId] = tagId;
-    this->approximate[mapId] = approximate;
+    approximateArray[mapId] = approximate;
+    if(updateReplacement) rp->update(mapId, req);
+}
+
+void uniDoppelgangerDataArray::changeInPlace(int32_t map, const MemReq* req, int32_t mapId, int32_t tagId, bool approximate, bool updateReplacement) {
+    mtagArray[mapId] = map;
+    tagPointerArray[mapId] = tagId;
+    approximateArray[mapId] = approximate;
     if(updateReplacement) rp->update(mapId, req);
 }
 
@@ -474,7 +507,7 @@ int32_t uniDoppelgangerDataArray::readMap(int32_t mapId) {
 void uniDoppelgangerDataArray::print() {
     for (uint32_t i = 0; i < this->numLines; i++) {
         if (tagPointerArray[i] != -1)
-            info("%i: %i, %i, %s", i, mtagArray[i], tagPointerArray[i], approximate[i]? "approximate":"exact");
+            info("%i: %i, %i, %s", i, mtagArray[i], tagPointerArray[i], approximateArray[i]? "approximate":"exact");
     }
 }
 
@@ -482,6 +515,1061 @@ uint32_t uniDoppelgangerDataArray::getValidLines() {
     return validLines;
 }
 // uniDoppelganger End
+
+// BDI Begin
+ApproximateBDITagArray::ApproximateBDITagArray(uint32_t _numLines, uint32_t _assoc, uint32_t _dataAssoc, ReplPolicy* _rp, HashFamily* _hf) : 
+rp(_rp), hf(_hf), numLines(_numLines), assoc(_assoc), dataAssoc(_dataAssoc) {
+    tagArray = gm_calloc<Address>(numLines);
+    segmentPointerArray = gm_malloc<int32_t>(numLines);
+    compressionEncodingArray = gm_malloc<BDICompressionEncoding>(numLines);
+    for (uint32_t i = 0; i < numLines; i++) {
+        segmentPointerArray[i] = -1;
+        compressionEncodingArray[i] = NONE;
+    }
+    approximateArray = gm_calloc<bool>(numLines);
+    numSets = numLines/assoc;
+    setMask = numSets - 1;
+    validLines = 0;
+    dataValidSegments = 0;
+    assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
+}
+
+ApproximateBDITagArray::~ApproximateBDITagArray() {
+    gm_free(tagArray);
+    gm_free(segmentPointerArray);
+    gm_free(compressionEncodingArray);
+    gm_free(approximateArray);
+}
+
+int32_t ApproximateBDITagArray::lookup(Address lineAddr, const MemReq* req, bool updateReplacement) {
+    uint32_t set = hf->hash(0, lineAddr) & setMask;
+    uint32_t first = set*assoc;
+    for (uint32_t id = first; id < first + assoc; id++) {
+        if (tagArray[id] ==  lineAddr) {
+            if (updateReplacement) rp->update(id, req);
+            return id;
+        }
+    }
+    return -1;
+}
+
+int32_t ApproximateBDITagArray::preinsert(Address lineAddr, const MemReq* req, Address* wbLineAddr) {
+    uint32_t set = hf->hash(0, lineAddr) & setMask;
+    uint32_t first = set*assoc;
+
+    uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc));
+
+    *wbLineAddr = tagArray[candidate];
+    return candidate;
+}
+
+int32_t ApproximateBDITagArray::needEviction(Address lineAddr, const MemReq* req, uint16_t size, g_vector<uint32_t>& alreadyEvicted, Address* wbLineAddr) {
+    uint32_t set = hf->hash(0, lineAddr) & setMask;
+    uint32_t first = set*assoc;
+    uint16_t occupiedSpace = 0;
+    for (uint32_t id = first; id < first + assoc; id++)
+        if (segmentPointerArray[id] != -1)
+            occupiedSpace += BDICompressionToSize(compressionEncodingArray[id], zinfo->lineSize);
+    if (dataAssoc*zinfo->lineSize - occupiedSpace >= size)
+        return -1;
+    else {
+        uint32_t candidate = rp->rank(req, SetAssocCands(first, first+assoc), alreadyEvicted);
+        *wbLineAddr = tagArray[candidate];
+        return candidate;
+    }
+}
+
+void ApproximateBDITagArray::postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int8_t segmentId, BDICompressionEncoding compression, bool approximate, bool updateReplacement) {
+    if (!tagArray[tagId] && lineAddr) {
+        validLines++;
+        dataValidSegments+=BDICompressionToSize(compression, zinfo->lineSize)/8;
+    } else if (tagArray[tagId] && !lineAddr) {
+        validLines--;
+        dataValidSegments-=BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize)/8;
+    } else {
+        dataValidSegments-=BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize)/8;
+        dataValidSegments+=BDICompressionToSize(compression, zinfo->lineSize)/8;
+    }
+    rp->replaced(tagId);
+    tagArray[tagId] = lineAddr;
+    segmentPointerArray[tagId] = segmentId;
+    compressionEncodingArray[tagId] = compression;
+    approximateArray[tagId] = approximate;
+    if(updateReplacement) rp->update(tagId, req);
+}
+
+BDICompressionEncoding ApproximateBDITagArray::readCompressionEncoding(int32_t tagId) {
+    return compressionEncodingArray[tagId];
+}
+
+int8_t ApproximateBDITagArray::readSegmentPointer(int32_t tagId) {
+    return segmentPointerArray[tagId];
+}
+
+void ApproximateBDITagArray::writeCompressionEncoding(int32_t tagId, BDICompressionEncoding encoding) {
+    dataValidSegments-=BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize)/8;
+    compressionEncodingArray[tagId] = encoding;
+    dataValidSegments+=BDICompressionToSize(encoding, zinfo->lineSize)/8;
+}
+
+uint32_t ApproximateBDITagArray::getValidLines() {
+    return validLines;
+}
+
+uint32_t ApproximateBDITagArray::getDataValidSegments() {
+    return dataValidSegments;
+}
+
+void ApproximateBDITagArray::print() {
+    for (uint32_t i = 0; i < this->numLines; i++) {
+        if (segmentPointerArray[i] != -1)
+            info("%i: %lu, %i, %s", i, tagArray[i] << lineBits, BDICompressionToSize(compressionEncodingArray[i], zinfo->lineSize), approximateArray[i]? "approximate":"exact");
+    }
+}
+
+// TODO: This was copied varbatim from https://github.com/CMU-SAFARI/BDICompression/blob/master/compression.c
+// optimize for our purposes later.
+uint64_t ApproximateBDIDataArray::my_llabs(int64_t x) {
+    uint64_t t = x >> 63;
+    return (x ^ t) - t;
+}
+
+// TODO: This was copied varbatim from https://github.com/CMU-SAFARI/BDICompression/blob/master/compression.c
+// and/or Amin. optimize for our purposes later.
+uint8_t ApproximateBDIDataArray::multiBaseCompression(uint64_t * values, uint8_t size, uint8_t blimit, uint8_t bsize) {
+    uint64_t limit = 0;
+    uint8_t numBase = 2;
+
+    //define the appropriate size for the mask
+    switch(blimit){
+        case 1:
+            limit = 0xFF;
+            break;
+        case 2:
+            limit = 0xFFFF;
+            break;
+        case 4:
+            limit = 0xFFFFFFFF;
+            break;
+        default:
+            panic("Wrong BDI Size");
+            return 0;
+    }
+
+    uint64_t mnumBase [64];
+    uint8_t baseCount = 1;
+    mnumBase[0] = 0;// values[0];
+
+    uint8_t i,j;
+    for (i = 0; i < size; i++) {
+        bool isFound=0;
+        for(j = 0; j <  baseCount; j++) {
+            if(my_llabs((int64_t)(mnumBase[j] -  values[i])) <= limit) {
+                isFound = 1;
+                break;
+            }
+        }
+        if(isFound == 0)
+            mnumBase[baseCount++] = values[i];
+        if(baseCount >= numBase)
+            break;
+    }
+    uint8_t compCount = 0;
+    for (i = 0; i < size; i++) {
+        for(j = 0; j <  baseCount; j++) {
+            if(my_llabs((int64_t)(mnumBase[j] -  values[i])) <= limit) {
+                compCount++;
+                break;
+            }
+        }
+    }
+
+    //return compressed size
+    uint8_t mCompSize = blimit * compCount + bsize * (numBase-1) + (size - compCount) * bsize; // implicit zero base gozashtim
+
+    uint8_t retVal = mCompSize;
+    if(compCount < size) {
+        retVal =  size * bsize;
+    }
+
+    return retVal;
+}
+
+BDICompressionEncoding ApproximateBDIDataArray::compress(const DataLine data, uint16_t* size) {
+    bool Zero = true;
+    bool Repetitive = true;
+    for (uint16_t i = 0; i < zinfo->lineSize/8; i++)
+    {
+        if (Zero && ((uint64_t*)data)[i] != 0)
+            Zero = false;
+        if (Repetitive && ((uint64_t*)data)[i] != ((uint64_t*)data)[0])
+            Repetitive = false;
+        if (!(Zero || Repetitive))
+            break;
+    }
+    if (Zero){                                                                                      // Size 1
+        *size = 8;
+        return ZERO;
+    }
+    if (Repetitive){                                                                                // Size 8
+        *size = 8;
+        return REPETITIVE;
+    }
+    if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/8, 1, 8) != zinfo->lineSize){        // Size 16
+        *size = 16;
+        return BASE8DELTA1;
+    }
+    if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/4, 1, 4) != zinfo->lineSize){        // Size 20
+        *size = 24;
+        return BASE4DELTA1;
+    }
+    if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/8, 2, 8) != zinfo->lineSize){        // Size 24
+        *size = 24;
+        return BASE8DELTA2;
+    }
+    if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/2, 1, 2) != zinfo->lineSize){        // Size 34
+        *size = 40;
+        return BASE2DELTA1;
+    }
+    if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/4, 2, 4) != zinfo->lineSize){        // Size 36
+        *size = 40;
+        return BASE4DELTA2;
+    }
+    if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/8, 4, 8) != zinfo->lineSize){        // Size 40
+        *size = 40;
+        return BASE8DELTA4;
+    }
+    *size = zinfo->lineSize;
+    return NONE;
+}
+
+void ApproximateBDIDataArray::approximate(const DataLine data, DataType type) {
+    if (type == ZSIM_FLOAT) {
+        for (uint16_t i = 0; i < zinfo->lineSize/4; i++)
+        {
+            ((uint32_t*) data)[i] = ((uint32_t*) data)[i] >> zinfo->floatCutSize;
+            // ((uint32_t*) data)[i] = ((uint32_t*) data)[i] << zinfo->floatCutSize;
+        }
+    } else if (type == ZSIM_DOUBLE) {
+        for (uint16_t i = 0; i < zinfo->lineSize/8; i++)
+        {
+            ((uint64_t*) data)[i] = ((uint64_t*) data)[i] >> zinfo->doubleCutSize;
+            // ((uint64_t*) data)[i] = ((uint64_t*) data)[i] << zinfo->doubleCutSize;
+        }
+    } else {
+        panic("We only approximate floats and doubles");
+    }
+}
+// BDI end
+
+// Dedup begin
+ApproximateDedupTagArray::ApproximateDedupTagArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf) : rp(_rp), hf(_hf), numLines(_numLines), assoc(_assoc)  {
+    tagArray = gm_calloc<Address>(numLines);
+    prevPointerArray = gm_calloc<int32_t>(numLines);
+    nextPointerArray = gm_calloc<int32_t>(numLines);
+    dataPointerArray = gm_calloc<int32_t>(numLines);
+    approximateArray = gm_calloc<bool>(numLines);
+    for (uint32_t i = 0; i < numLines; i++) {
+        prevPointerArray[i] = -1;
+        nextPointerArray[i] = -1;
+        dataPointerArray[i] = -1;
+    }
+    numSets = numLines/assoc;
+    setMask = numSets - 1;
+    validLines = 0;
+    assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
+}
+
+ApproximateDedupTagArray::~ApproximateDedupTagArray() {
+    gm_free(tagArray);
+    gm_free(prevPointerArray);
+    gm_free(nextPointerArray);
+    gm_free(dataPointerArray);
+    gm_free(approximateArray);
+}
+
+int32_t ApproximateDedupTagArray::lookup(Address lineAddr, const MemReq* req, bool updateReplacement) {
+    uint32_t set = hf->hash(0, lineAddr) & setMask;
+    uint32_t first = set*assoc;
+    for (uint32_t id = first; id < first + assoc; id++) {
+        if (tagArray[id] ==  lineAddr) {
+            if (updateReplacement) rp->update(id, req);
+            return id;
+        }
+    }
+    return -1;
+}
+
+int32_t ApproximateDedupTagArray::preinsert(Address lineAddr, const MemReq* req, Address* wbLineAddr) {
+    uint32_t set = hf->hash(0, lineAddr) & setMask;
+    uint32_t first = set*assoc;
+
+    uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc));
+
+    *wbLineAddr = tagArray[candidate];
+    return candidate;
+}
+
+bool ApproximateDedupTagArray::evictAssociatedData(int32_t lineId, int32_t* newLLHead, bool* approximate) {
+    *newLLHead = -1;
+    if (dataPointerArray[lineId] == -1)
+        return false;
+    // if (!approximateArray[lineId])
+    //     return true;
+    // *approximate = true;
+    if (prevPointerArray[lineId] != -1)
+        return false;
+    else
+        *newLLHead = nextPointerArray[lineId];
+    if (nextPointerArray[lineId] != -1)
+        return false;
+    return true;
+}
+
+void ApproximateDedupTagArray::postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t listHead, bool approximate, bool updateReplacement) {
+    if (!tagArray[tagId] && lineAddr) {
+        validLines++;
+    } else if (tagArray[tagId] && !lineAddr) {
+        validLines--;
+    }
+    rp->replaced(tagId);
+    tagArray[tagId] = lineAddr;
+    dataPointerArray[tagId] = dataId;
+    approximateArray[tagId] = approximate;
+    if (prevPointerArray[tagId] != -1)
+        nextPointerArray[prevPointerArray[tagId]] = nextPointerArray[tagId];
+    if (nextPointerArray[tagId] != -1)
+        prevPointerArray[nextPointerArray[tagId]] = prevPointerArray[tagId];
+    prevPointerArray[tagId] = -1;
+    nextPointerArray[tagId] = listHead;
+    if (listHead >= 0) {
+        if(prevPointerArray[listHead] == -1) prevPointerArray[listHead] = tagId;
+        else panic("List head is not actually a list head!");
+    }
+    if(updateReplacement) rp->update(tagId, req);
+}
+
+void ApproximateDedupTagArray::changeInPlace(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t listHead, bool approximate, bool updateReplacement) {
+    tagArray[tagId] = lineAddr;
+    dataPointerArray[tagId] = dataId;
+    approximateArray[tagId] = approximate;
+    if (prevPointerArray[tagId] != -1)
+        nextPointerArray[prevPointerArray[tagId]] = nextPointerArray[tagId];
+    if (nextPointerArray[tagId] != -1)
+        prevPointerArray[nextPointerArray[tagId]] = prevPointerArray[tagId];
+    prevPointerArray[tagId] = -1;
+    nextPointerArray[tagId] = listHead;
+    if (listHead >= 0) {
+        if(prevPointerArray[listHead] == -1) prevPointerArray[listHead] = tagId;
+        else panic("List head is not actually a list head!");
+    }
+    if(updateReplacement) rp->update(tagId, req);
+}
+
+int32_t ApproximateDedupTagArray::readDataId(const int32_t tagId) {
+    // assert_msg(!approximate[tagId], "must be exact to read dataId");
+    return dataPointerArray[tagId];
+}
+
+Address ApproximateDedupTagArray::readAddress(int32_t tagId) {
+    return tagArray[tagId];
+}
+
+int32_t ApproximateDedupTagArray::readNextLL(int32_t tagId) {
+    return nextPointerArray[tagId];
+}
+
+int32_t ApproximateDedupTagArray::readPrevLL(int32_t tagId) {
+    return prevPointerArray[tagId];
+}
+
+uint32_t ApproximateDedupTagArray::getValidLines() {
+    return validLines;
+}
+
+void ApproximateDedupTagArray::print() {
+    for (uint32_t i = 0; i < this->numLines; i++) {
+        if (dataPointerArray[i] != -1)
+            info("%i: %lu, %i, %i, %i, %s", i, tagArray[i] << lineBits, prevPointerArray[i], nextPointerArray[i], dataPointerArray[i], approximateArray[i]? "approximate":"exact");
+    }
+}
+
+ApproximateDedupDataArray::ApproximateDedupDataArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf) : rp(_rp), hf(_hf), numLines(_numLines), assoc(_assoc)  {
+    tagCounterArray = gm_calloc<int32_t>(numLines);
+    tagPointerArray = gm_malloc<int32_t>(numLines);
+    approximateArray = gm_calloc<bool>(numLines);
+    dataArray = gm_calloc<DataLine>(numLines);
+    for (uint32_t i = 0; i < numLines; i++) {
+        tagPointerArray[i] = -1;
+        dataArray[i] = gm_calloc<uint8_t>(zinfo->lineSize);
+    }
+    numSets = numLines/assoc;
+    setMask = numSets - 1;
+    validLines = 0;
+    srand (time(NULL));        
+    assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
+}
+
+ApproximateDedupDataArray::~ApproximateDedupDataArray() {
+    gm_free(tagCounterArray);
+    gm_free(tagPointerArray);
+    gm_free(approximateArray);
+    for (uint32_t i = 0; i < numLines; i++) {
+        gm_free(dataArray[i]);
+    }
+    gm_free(dataArray);
+}
+
+void ApproximateDedupDataArray::lookup(int32_t dataId, const MemReq* req, bool updateReplacement) {
+    if (updateReplacement) rp->update(dataId, req);
+}
+
+int32_t ApproximateDedupDataArray::preinsert(int32_t* tagPointer) {
+    int32_t leastValue = 999999;
+    int32_t leastId = 0;
+    for (uint32_t i = 0; i < 4; i++) {
+        int32_t id = rand() % numLines;
+        if (tagCounterArray[id] < leastValue) {
+            leastValue = tagCounterArray[id];
+            leastId = id;
+        }
+    }
+    *tagPointer = tagPointerArray[leastId];
+    return leastId;
+}
+
+void ApproximateDedupDataArray::postinsert(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, bool approximate, DataLine data, bool updateReplacement) {
+    if (tagPointerArray[dataId] == -1 && tagId != -1) {
+        validLines++;
+    } else if (tagPointerArray[dataId] != -1 && tagId == -1) {
+        validLines--;
+    }
+    if (data)
+        PIN_SafeCopy(dataArray[dataId], data, zinfo->lineSize);
+    rp->replaced(dataId);
+    tagCounterArray[dataId] = counter;
+    tagPointerArray[dataId] = tagId;
+    approximateArray[dataId] = approximate;
+    if(updateReplacement) rp->update(dataId, req);
+}
+
+void ApproximateDedupDataArray::changeInPlace(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, bool approximate, DataLine data, bool updateReplacement) {
+    if (data)
+        PIN_SafeCopy(dataArray[dataId], data, zinfo->lineSize);
+    // rp->replaced(dataId);
+    tagCounterArray[dataId] = counter;
+    tagPointerArray[dataId] = tagId;
+    approximateArray[dataId] = approximate;
+    if(updateReplacement) rp->update(dataId, req);
+}
+
+bool ApproximateDedupDataArray::isSame(int32_t dataId, DataLine data) {
+    for (uint32_t i = 0; i < zinfo->lineSize/8; i++)
+        if (((uint64_t*)data)[i] != ((uint64_t*)dataArray[dataId])[i])
+            return false;
+    return true;
+}
+
+int32_t ApproximateDedupDataArray::readListHead(int32_t dataId) {
+    return tagPointerArray[dataId];
+}
+
+int32_t ApproximateDedupDataArray::readCounter(int32_t dataId) {
+    return tagCounterArray[dataId];
+}
+
+DataLine ApproximateDedupDataArray::readData(int32_t dataId) {
+    return dataArray[dataId];
+}
+
+void ApproximateDedupDataArray::writeData(int32_t dataId, DataLine data, const MemReq* req, bool updateReplacement) {
+    PIN_SafeCopy(dataArray[dataId], data, zinfo->lineSize);
+    if(updateReplacement) rp->update(dataId, req);
+}
+
+uint32_t ApproximateDedupDataArray::getValidLines() {
+    return validLines;
+}
+
+void ApproximateDedupDataArray::print() {
+    for (uint32_t i = 0; i < this->numLines; i++) {
+        if (tagPointerArray[i] != -1)
+            info("%i: %i, %i, %s", i, tagCounterArray[i], tagPointerArray[i], approximateArray[i]? "approximate":"exact");
+    }
+}
+
+ApproximateDedupHashArray::ApproximateDedupHashArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf, H3HashFamily* _dataHash) : rp(_rp), hf(_hf), dataHash(_dataHash), numLines(_numLines), assoc(_assoc)  {
+    hashArray = gm_calloc<uint64_t>(numLines);
+    dataPointerArray = gm_malloc<int32_t>(numLines);
+    for (uint32_t i = 0; i < numLines; i++) {
+        dataPointerArray[i] = -1;
+    }
+    numSets = numLines/assoc;
+    setMask = numSets - 1;
+    assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
+}
+
+ApproximateDedupHashArray::~ApproximateDedupHashArray() {
+    gm_free(hashArray);
+    gm_free(dataPointerArray);
+}
+
+int32_t ApproximateDedupHashArray::lookup(uint64_t hash, const MemReq* req, bool updateReplacement) {
+    uint32_t set = hf->hash(0, hash) & setMask;
+    uint32_t first = set*assoc;
+    for (uint32_t id = first; id < first + assoc; id++) {
+        if (hashArray[id] ==  hash) {
+            if (updateReplacement) rp->update(id, req);
+            return id;
+        }
+    }
+    return -1;
+}
+
+int32_t ApproximateDedupHashArray::preinsert(uint64_t hash, const MemReq* req) {
+    uint32_t set = hf->hash(0, hash) & setMask;
+    uint32_t first = set*assoc;
+
+    uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc));
+
+    return candidate;
+}
+
+void ApproximateDedupHashArray::postinsert(uint64_t hash, const MemReq* req, int32_t dataPointer, int32_t hashId, bool updateReplacement) {
+    rp->replaced(hashId);
+    hashArray[hashId] = hash;
+    dataPointerArray[hashId] = dataPointer;
+    if(updateReplacement) rp->update(hashId, req);
+}
+
+int32_t ApproximateDedupHashArray::readDataPointer(int32_t hashId) {
+    return dataPointerArray[hashId];
+}
+
+void ApproximateDedupHashArray::approximate(const DataLine data, DataType type) {
+    if (type == ZSIM_FLOAT) {
+        for (uint16_t i = 0; i < zinfo->lineSize/4; i++)
+        {
+            ((uint32_t*) data)[i] = ((uint32_t*) data)[i] >> zinfo->floatCutSize;
+            ((uint32_t*) data)[i] = ((uint32_t*) data)[i] << zinfo->floatCutSize;
+        }
+    } else if (type == ZSIM_DOUBLE) {
+        for (uint16_t i = 0; i < zinfo->lineSize/8; i++)
+        {
+            ((uint64_t*) data)[i] = ((uint64_t*) data)[i] >> zinfo->doubleCutSize;
+            ((uint64_t*) data)[i] = ((uint64_t*) data)[i] << zinfo->doubleCutSize;
+        }
+    } else {
+        panic("We only approximate floats and doubles");
+    }
+}
+
+uint64_t ApproximateDedupHashArray::hash(const DataLine data)
+{
+    uint8_t _0;
+    uint8_t _1;
+    uint8_t _2;
+    uint8_t _3;
+    uint8_t _4;
+    uint8_t _5;
+    uint8_t _6;
+    uint8_t _7;
+    uint8_t* dataLine = (uint8_t*) data;
+    // --------------------------------------------------------------------
+    uint8_t xorNeeded = zinfo->lineSize/8;
+    if (  xorNeeded == 8 )
+    {
+        _0 = dataLine[0] ^ dataLine[0+8] ^ dataLine[0+16] ^ dataLine[0+24] ^ dataLine[0+32] ^ dataLine[0+40] ^ dataLine[0+48] ^ dataLine[0+56];
+        _1 = dataLine[1] ^ dataLine[1+8] ^ dataLine[1+16] ^ dataLine[1+24] ^ dataLine[1+32] ^ dataLine[1+40] ^ dataLine[1+48] ^ dataLine[1+56];
+        _2 = dataLine[2] ^ dataLine[2+8] ^ dataLine[2+16] ^ dataLine[2+24] ^ dataLine[2+32] ^ dataLine[2+40] ^ dataLine[2+48] ^ dataLine[2+56];
+        _3 = dataLine[3] ^ dataLine[3+8] ^ dataLine[3+16] ^ dataLine[3+24] ^ dataLine[3+32] ^ dataLine[3+40] ^ dataLine[3+48] ^ dataLine[3+56];
+        _4 = dataLine[4] ^ dataLine[4+8] ^ dataLine[4+16] ^ dataLine[4+24] ^ dataLine[4+32] ^ dataLine[4+40] ^ dataLine[4+48] ^ dataLine[4+56];
+        _5 = dataLine[5] ^ dataLine[5+8] ^ dataLine[5+16] ^ dataLine[5+24] ^ dataLine[5+32] ^ dataLine[5+40] ^ dataLine[5+48] ^ dataLine[5+56];
+        _6 = dataLine[6] ^ dataLine[6+8] ^ dataLine[6+16] ^ dataLine[6+24] ^ dataLine[6+32] ^ dataLine[6+40] ^ dataLine[6+48] ^ dataLine[6+56];
+        _7 = dataLine[7] ^ dataLine[7+8] ^ dataLine[7+16] ^ dataLine[7+24] ^ dataLine[7+32] ^ dataLine[7+40] ^ dataLine[7+48] ^ dataLine[7+56];
+    }
+    else if ( xorNeeded == 4 )
+    {
+
+        _0 = dataLine[0] ^ dataLine[0+8] ^ dataLine[0+16] ^ dataLine[0+24];
+        _1 = dataLine[1] ^ dataLine[1+8] ^ dataLine[1+16] ^ dataLine[1+24];
+        _2 = dataLine[2] ^ dataLine[2+8] ^ dataLine[2+16] ^ dataLine[2+24];
+        _3 = dataLine[3] ^ dataLine[3+8] ^ dataLine[3+16] ^ dataLine[3+24];
+        _4 = dataLine[4] ^ dataLine[4+8] ^ dataLine[4+16] ^ dataLine[4+24];
+        _5 = dataLine[5] ^ dataLine[5+8] ^ dataLine[5+16] ^ dataLine[5+24];
+        _6 = dataLine[6] ^ dataLine[6+8] ^ dataLine[6+16] ^ dataLine[6+24];
+        _7 = dataLine[7] ^ dataLine[7+8] ^ dataLine[7+16] ^ dataLine[7+24];
+
+    } else if ( xorNeeded == 2 )
+    {
+        _0 = dataLine[0] ^ dataLine[0+8];
+        _1 = dataLine[1] ^ dataLine[1+8];
+        _2 = dataLine[2] ^ dataLine[2+8];
+        _3 = dataLine[3] ^ dataLine[3+8];
+        _4 = dataLine[4] ^ dataLine[4+8];
+        _5 = dataLine[5] ^ dataLine[5+8];
+        _6 = dataLine[6] ^ dataLine[6+8];
+        _7 = dataLine[7] ^ dataLine[7+8];
+    } else
+    {
+        panic("not implemented yet for lines other than 16B/32B/64B");
+    }
+    // --------------------------------------------------------------------
+    uint64_t XORs =       ((uint64_t) _0) + (((uint64_t) _1) << 8)  + (((uint64_t) _2) << 16) + (((uint64_t) _3) << 24)
+    + (((uint64_t) _4) << 32) + (((uint64_t) _5) << 40) + (((uint64_t) _6) << 48) + (((uint64_t) _7) << 56) ;
+
+    uint64_t hashKey = dataHash->hash(0,XORs) & setMask; // /*<< hashWayBits;*/
+    
+    return hashKey;
+}
+
+void ApproximateDedupHashArray::print() {
+    for (uint32_t i = 0; i < this->numLines; i++) {
+        if (dataPointerArray[i] != -1)
+            info("%i: %lu, %i", i, hashArray[i], dataPointerArray[i]);
+    }
+}
+// Dedup end
+
+// Dedup BDI Begin
+ApproximateDedupBDITagArray::ApproximateDedupBDITagArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf) : rp(_rp), hf(_hf), numLines(_numLines), assoc(_assoc)  {
+    tagArray = gm_calloc<Address>(numLines);
+    segmentPointerArray = gm_calloc<int32_t>(numLines);
+    prevPointerArray = gm_calloc<int32_t>(numLines);
+    nextPointerArray = gm_calloc<int32_t>(numLines);
+    dataPointerArray = gm_calloc<int32_t>(numLines);
+    compressionEncodingArray = gm_calloc<BDICompressionEncoding>(numLines);
+    for (uint32_t i = 0; i < numLines; i++) {
+        prevPointerArray[i] = -1;
+        nextPointerArray[i] = -1;
+        dataPointerArray[i] = -1;
+        segmentPointerArray[i] = -1;
+        compressionEncodingArray[i] = NONE;
+    }
+    numSets = numLines/assoc;
+    setMask = numSets - 1;
+    validLines = 0;
+    dataValidSegments = 0;
+    assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
+}
+
+ApproximateDedupBDITagArray::~ApproximateDedupBDITagArray() {
+    gm_free(tagArray);
+    gm_free(segmentPointerArray);
+    gm_free(prevPointerArray);
+    gm_free(nextPointerArray);
+    gm_free(dataPointerArray);
+    gm_free(compressionEncodingArray);
+}
+
+int32_t ApproximateDedupBDITagArray::lookup(Address lineAddr, const MemReq* req, bool updateReplacement) {
+    uint32_t set = hf->hash(0, lineAddr) & setMask;
+    uint32_t first = set*assoc;
+    for (uint32_t id = first; id < first + assoc; id++) {
+        if (tagArray[id] ==  lineAddr) {
+            if (updateReplacement) rp->update(id, req);
+            return id;
+        }
+    }
+    return -1;
+}
+
+int32_t ApproximateDedupBDITagArray::preinsert(Address lineAddr, const MemReq* req, Address* wbLineAddr) {
+    uint32_t set = hf->hash(0, lineAddr) & setMask;
+    uint32_t first = set*assoc;
+
+    uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc));
+
+    *wbLineAddr = tagArray[candidate];
+    return candidate;
+}
+
+bool ApproximateDedupBDITagArray::evictAssociatedData(int32_t lineId, int32_t* newLLHead) {
+    *newLLHead = -1;
+    if (dataPointerArray[lineId] == -1)
+        return false;
+    // if (!approximateArray[lineId])
+    //     return true;
+    // *approximate = true;
+    if (prevPointerArray[lineId] != -1)
+        return false;
+    else
+        *newLLHead = nextPointerArray[lineId];
+    if (nextPointerArray[lineId] != -1)
+        return false;
+    return true;
+}
+
+void ApproximateDedupBDITagArray::postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t segmentId, BDICompressionEncoding encoding, int32_t listHead, bool updateReplacement) {
+    if (!tagArray[tagId] && lineAddr) {
+        validLines++;
+        dataValidSegments+=BDICompressionToSize(encoding, zinfo->lineSize)/8;
+    } else if (tagArray[tagId] && !lineAddr) {
+        validLines--;
+        dataValidSegments-=BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize)/8;
+    } else {
+        dataValidSegments-=BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize)/8;
+        dataValidSegments+=BDICompressionToSize(encoding, zinfo->lineSize)/8;
+    }
+    rp->replaced(tagId);
+    tagArray[tagId] = lineAddr;
+    dataPointerArray[tagId] = dataId;
+    segmentPointerArray[tagId] = segmentId;
+    compressionEncodingArray[tagId] = encoding;
+    if (prevPointerArray[tagId] != -1)
+        nextPointerArray[prevPointerArray[tagId]] = nextPointerArray[tagId];
+    if (nextPointerArray[tagId] != -1)
+        prevPointerArray[nextPointerArray[tagId]] = prevPointerArray[tagId];
+    prevPointerArray[tagId] = -1;
+    nextPointerArray[tagId] = listHead;
+    if (listHead >= 0) {
+        if(prevPointerArray[listHead] == -1) prevPointerArray[listHead] = tagId;
+        else panic("List head is not actually a list head!");
+    }
+    if(updateReplacement) rp->update(tagId, req);
+}
+
+void ApproximateDedupBDITagArray::changeInPlace(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t segmentId, BDICompressionEncoding encoding, int32_t listHead, bool updateReplacement) {
+    tagArray[tagId] = lineAddr;
+    dataPointerArray[tagId] = dataId;
+    segmentPointerArray[tagId] = segmentId;
+    compressionEncodingArray[tagId] = encoding;
+    if (prevPointerArray[tagId] != -1)
+        nextPointerArray[prevPointerArray[tagId]] = nextPointerArray[tagId];
+    if (nextPointerArray[tagId] != -1)
+        prevPointerArray[nextPointerArray[tagId]] = prevPointerArray[tagId];
+    prevPointerArray[tagId] = -1;
+    nextPointerArray[tagId] = listHead;
+    if (listHead >= 0) {
+        if(prevPointerArray[listHead] == -1) prevPointerArray[listHead] = tagId;
+        else panic("List head is not actually a list head!");
+    }
+    if(updateReplacement) rp->update(tagId, req);
+}
+
+BDICompressionEncoding ApproximateDedupBDITagArray::readCompressionEncoding(int32_t tagId) {
+    return compressionEncodingArray[tagId];
+}
+
+void ApproximateDedupBDITagArray::writeCompressionEncoding(int32_t tagId, BDICompressionEncoding encoding) {
+    dataValidSegments-=BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize)/8;
+    compressionEncodingArray[tagId] = encoding;
+    dataValidSegments+=BDICompressionToSize(encoding, zinfo->lineSize)/8;
+}
+
+int32_t ApproximateDedupBDITagArray::readDataId(int32_t tagId) {
+    // assert_msg(!approximate[tagId], "must be exact to read dataId");
+    return dataPointerArray[tagId];
+}
+
+int32_t ApproximateDedupBDITagArray::readSegmentPointer(int32_t tagId) {
+    // assert_msg(!approximate[tagId], "must be exact to read dataId");
+    return segmentPointerArray[tagId];
+}
+
+Address ApproximateDedupBDITagArray::readAddress(int32_t tagId) {
+    return tagArray[tagId];
+}
+
+int32_t ApproximateDedupBDITagArray::readNextLL(int32_t tagId) {
+    return nextPointerArray[tagId];
+}
+
+int32_t ApproximateDedupBDITagArray::readPrevLL(int32_t tagId) {
+    return prevPointerArray[tagId];
+}
+
+uint32_t ApproximateDedupBDITagArray::getValidLines() {
+    return validLines;
+}
+
+uint32_t ApproximateDedupBDITagArray::getDataValidSegments() {
+    return dataValidSegments;
+}
+
+void ApproximateDedupBDITagArray::print() {
+    for (uint32_t i = 0; i < this->numLines; i++) {
+        if (dataPointerArray[i] != -1)
+            info("%i: %lu, %i, %i, %i", i, tagArray[i] << lineBits, prevPointerArray[i], nextPointerArray[i], dataPointerArray[i]);
+    }
+}
+
+ApproximateDedupBDIDataArray::ApproximateDedupBDIDataArray(uint32_t _numLines, uint32_t _assoc, HashFamily* _hf) : hf(_hf), numLines(_numLines), assoc(_assoc)  {
+    numSets = numLines/assoc;
+    tagCounterArray = gm_calloc<int32_t*>(numSets);
+    tagPointerArray = gm_malloc<int32_t*>(numSets);
+    // approximateArray = gm_calloc<bool>(numLines);
+    compressedDataArray = gm_calloc<DataLine*>(numSets);
+    for (uint32_t i = 0; i < numSets; i++) {
+        tagCounterArray[i] = gm_calloc<int32_t>(assoc*zinfo->lineSize/8);
+        tagPointerArray[i] = gm_calloc<int32_t>(assoc*zinfo->lineSize/8);
+        compressedDataArray[i] = gm_calloc<DataLine>(assoc*zinfo->lineSize/8);
+        for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++) {
+            tagPointerArray[i][j] = -1;
+            compressedDataArray[i][j] = gm_calloc<uint8_t>(zinfo->lineSize);
+        }
+    }
+    setMask = numSets - 1;
+    validLines = 0;
+    srand (time(NULL));        
+    assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
+}
+
+ApproximateDedupBDIDataArray::~ApproximateDedupBDIDataArray() {
+    for (uint32_t i = 0; i < numSets; i++) {
+        for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++) {
+            gm_free(compressedDataArray[i][j]);
+        }
+        gm_free(tagCounterArray[i]);
+        gm_free(tagPointerArray[i]);
+        gm_free(compressedDataArray[i]);
+    }
+    gm_free(tagCounterArray);
+    gm_free(tagPointerArray);
+    gm_free(compressedDataArray);
+}
+
+void ApproximateDedupBDIDataArray::lookup(int32_t dataId, const MemReq* req, bool updateReplacement) {
+    // if (updateReplacement) rp->update(dataId, req);
+}
+
+int32_t ApproximateDedupBDIDataArray::preinsert() {
+    int32_t leastValue = 999999;
+    int32_t leastId = 0;
+    for (uint32_t i = 0; i < 4; i++) {
+        int32_t id = rand() % numSets;
+        int32_t counts = 0;
+        for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++)
+            counts += tagCounterArray[id][j];
+        if (counts < leastValue) {
+            leastId = id;
+        }
+    }
+    return leastId;
+}
+
+int32_t ApproximateDedupBDIDataArray::preinsert(int32_t dataId, int32_t* tagId, g_vector<uint32_t>& exceptions) {
+    int32_t leastValue = 999999;
+    int32_t leastId = 0;
+    for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++) {
+        bool Found = false;
+        for (uint32_t i = 0; i < exceptions.size(); i++)
+            if (j == exceptions[i]) {
+                Found = true;
+                break;
+            }
+        if (Found)
+            continue;
+        if (tagCounterArray[dataId][j] < leastValue) {
+            leastValue = tagCounterArray[dataId][j];
+            leastId = j;
+        }
+    }
+    *tagId = tagPointerArray[dataId][leastId];
+    return leastId;
+}
+
+// int32_t ApproximateDedupBDIDataArray::needEviction(int32_t dataId, const MemReq* req, uint16_t size, g_vector<uint32_t>& alreadyEvicted, Address* wbLineAddr) {
+//     uint16_t occupiedSpace = 0;
+//     for (uint32_t i = 0; i < assoc*zinfo->lineSize/8; i++)
+//         if (tagPointerArray[dataId][i] != -1)
+//             occupiedSpace += BDICompressionToSize(compressionEncodingArray[id], zinfo->lineSize);
+
+//     if (dataAssoc*zinfo->lineSize - occupiedSpace >= size)
+//         return -1;
+//     else {
+//         uint32_t candidate = rp->rank(req, SetAssocCands(first, first+assoc), alreadyEvicted);
+//         *wbLineAddr = tagArray[candidate];
+//         return candidate;
+//     }
+// }
+
+void ApproximateDedupBDIDataArray::postinsert(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, int32_t segmentId, DataLine data) {
+    if (tagPointerArray[dataId][segmentId] == -1 && tagId != -1) {
+        validLines++;
+    } else if (tagPointerArray[dataId][segmentId] != -1 && tagId == -1) {
+        validLines--;
+    }
+    if (data)
+        PIN_SafeCopy(compressedDataArray[dataId][segmentId], data, zinfo->lineSize);
+    tagCounterArray[dataId][segmentId] = counter;
+    tagPointerArray[dataId][segmentId] = tagId;
+}
+
+bool ApproximateDedupBDIDataArray::isSame(int32_t dataId, int32_t segmentId, DataLine data) {
+    for (uint32_t i = 0; i < zinfo->lineSize/8; i++)
+        if (((uint64_t*)data)[i] != ((uint64_t*)compressedDataArray[dataId][segmentId])[i])
+            return false;
+    return true;
+}
+
+int32_t ApproximateDedupBDIDataArray::readListHead(int32_t dataId, int32_t segmentId) {
+    return tagPointerArray[dataId][segmentId];
+}
+
+int32_t ApproximateDedupBDIDataArray::readCounter(int32_t dataId, int32_t segmentId) {
+    return tagCounterArray[dataId][segmentId];
+}
+
+DataLine ApproximateDedupBDIDataArray::readData(int32_t dataId, int32_t segmentId) {
+    return compressedDataArray[dataId][segmentId];
+}
+
+void ApproximateDedupBDIDataArray::writeData(int32_t dataId, int32_t segmentId, DataLine data, const MemReq* req, bool updateReplacement) {
+    PIN_SafeCopy(compressedDataArray[dataId][segmentId], data, zinfo->lineSize);
+}
+
+uint32_t ApproximateDedupBDIDataArray::getValidLines() {
+    return validLines;
+}
+
+void ApproximateDedupBDIDataArray::print() {
+    // for (uint32_t i = 0; i < this->numLines; i++) {
+        // if (tagPointerArray[i] != -1)
+        //     info("%i: %i, %i", i, tagCounterArray[i], tagPointerArray[i]);
+    // }
+}
+
+ApproximateDedupBDIHashArray::ApproximateDedupBDIHashArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf, H3HashFamily* _dataHash) : rp(_rp), hf(_hf), dataHash(_dataHash), numLines(_numLines), assoc(_assoc)  {
+    hashArray = gm_calloc<uint64_t>(numLines);
+    dataPointerArray = gm_malloc<int32_t>(numLines);
+    segmentPointerArray = gm_malloc<int32_t>(numLines);
+    for (uint32_t i = 0; i < numLines; i++) {
+        dataPointerArray[i] = -1;
+        segmentPointerArray[i] = -1;
+    }
+    numSets = numLines/assoc;
+    setMask = numSets - 1;
+    assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
+}
+
+ApproximateDedupBDIHashArray::~ApproximateDedupBDIHashArray() {
+    gm_free(hashArray);
+    gm_free(dataPointerArray);
+    gm_free(segmentPointerArray);
+}
+
+int32_t ApproximateDedupBDIHashArray::lookup(uint64_t hash, const MemReq* req, bool updateReplacement) {
+    uint32_t set = hf->hash(0, hash) & setMask;
+    uint32_t first = set*assoc;
+    for (uint32_t id = first; id < first + assoc; id++) {
+        if (hashArray[id] ==  hash) {
+            if (updateReplacement) rp->update(id, req);
+            return id;
+        }
+    }
+    return -1;
+}
+
+int32_t ApproximateDedupBDIHashArray::preinsert(uint64_t hash, const MemReq* req) {
+    uint32_t set = hf->hash(0, hash) & setMask;
+    uint32_t first = set*assoc;
+
+    uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc));
+
+    return candidate;
+}
+
+void ApproximateDedupBDIHashArray::postinsert(uint64_t hash, const MemReq* req, int32_t dataPointer, int32_t segmentPointer, int32_t hashId, bool updateReplacement) {
+    rp->replaced(hashId);
+    hashArray[hashId] = hash;
+    dataPointerArray[hashId] = dataPointer;
+    segmentPointerArray[hashId] = segmentPointer;
+    if(updateReplacement) rp->update(hashId, req);
+}
+
+int32_t ApproximateDedupBDIHashArray::readDataPointer(int32_t hashId) {
+    return dataPointerArray[hashId];
+}
+
+int32_t ApproximateDedupBDIHashArray::readSegmentPointer(int32_t hashId) {
+    return segmentPointerArray[hashId];
+}
+
+void ApproximateDedupBDIHashArray::approximate(const DataLine data, DataType type) {
+    if (type == ZSIM_FLOAT) {
+        for (uint16_t i = 0; i < zinfo->lineSize/4; i++)
+        {
+            ((uint32_t*) data)[i] = ((uint32_t*) data)[i] >> zinfo->floatCutSize;
+            ((uint32_t*) data)[i] = ((uint32_t*) data)[i] << zinfo->floatCutSize;
+        }
+    } else if (type == ZSIM_DOUBLE) {
+        for (uint16_t i = 0; i < zinfo->lineSize/8; i++)
+        {
+            ((uint64_t*) data)[i] = ((uint64_t*) data)[i] >> zinfo->doubleCutSize;
+            ((uint64_t*) data)[i] = ((uint64_t*) data)[i] << zinfo->doubleCutSize;
+        }
+    } else {
+        panic("We only approximate floats and doubles");
+    }
+}
+
+uint64_t ApproximateDedupBDIHashArray::hash(const DataLine data)
+{
+    uint8_t _0;
+    uint8_t _1;
+    uint8_t _2;
+    uint8_t _3;
+    uint8_t _4;
+    uint8_t _5;
+    uint8_t _6;
+    uint8_t _7;
+    uint8_t* dataLine = (uint8_t*) data;
+    // --------------------------------------------------------------------
+    uint8_t xorNeeded = zinfo->lineSize/8;
+    if (  xorNeeded == 8 )
+    {
+        _0 = dataLine[0] ^ dataLine[0+8] ^ dataLine[0+16] ^ dataLine[0+24] ^ dataLine[0+32] ^ dataLine[0+40] ^ dataLine[0+48] ^ dataLine[0+56];
+        _1 = dataLine[1] ^ dataLine[1+8] ^ dataLine[1+16] ^ dataLine[1+24] ^ dataLine[1+32] ^ dataLine[1+40] ^ dataLine[1+48] ^ dataLine[1+56];
+        _2 = dataLine[2] ^ dataLine[2+8] ^ dataLine[2+16] ^ dataLine[2+24] ^ dataLine[2+32] ^ dataLine[2+40] ^ dataLine[2+48] ^ dataLine[2+56];
+        _3 = dataLine[3] ^ dataLine[3+8] ^ dataLine[3+16] ^ dataLine[3+24] ^ dataLine[3+32] ^ dataLine[3+40] ^ dataLine[3+48] ^ dataLine[3+56];
+        _4 = dataLine[4] ^ dataLine[4+8] ^ dataLine[4+16] ^ dataLine[4+24] ^ dataLine[4+32] ^ dataLine[4+40] ^ dataLine[4+48] ^ dataLine[4+56];
+        _5 = dataLine[5] ^ dataLine[5+8] ^ dataLine[5+16] ^ dataLine[5+24] ^ dataLine[5+32] ^ dataLine[5+40] ^ dataLine[5+48] ^ dataLine[5+56];
+        _6 = dataLine[6] ^ dataLine[6+8] ^ dataLine[6+16] ^ dataLine[6+24] ^ dataLine[6+32] ^ dataLine[6+40] ^ dataLine[6+48] ^ dataLine[6+56];
+        _7 = dataLine[7] ^ dataLine[7+8] ^ dataLine[7+16] ^ dataLine[7+24] ^ dataLine[7+32] ^ dataLine[7+40] ^ dataLine[7+48] ^ dataLine[7+56];
+    }
+    else if ( xorNeeded == 4 )
+    {
+
+        _0 = dataLine[0] ^ dataLine[0+8] ^ dataLine[0+16] ^ dataLine[0+24];
+        _1 = dataLine[1] ^ dataLine[1+8] ^ dataLine[1+16] ^ dataLine[1+24];
+        _2 = dataLine[2] ^ dataLine[2+8] ^ dataLine[2+16] ^ dataLine[2+24];
+        _3 = dataLine[3] ^ dataLine[3+8] ^ dataLine[3+16] ^ dataLine[3+24];
+        _4 = dataLine[4] ^ dataLine[4+8] ^ dataLine[4+16] ^ dataLine[4+24];
+        _5 = dataLine[5] ^ dataLine[5+8] ^ dataLine[5+16] ^ dataLine[5+24];
+        _6 = dataLine[6] ^ dataLine[6+8] ^ dataLine[6+16] ^ dataLine[6+24];
+        _7 = dataLine[7] ^ dataLine[7+8] ^ dataLine[7+16] ^ dataLine[7+24];
+
+    } else if ( xorNeeded == 2 )
+    {
+        _0 = dataLine[0] ^ dataLine[0+8];
+        _1 = dataLine[1] ^ dataLine[1+8];
+        _2 = dataLine[2] ^ dataLine[2+8];
+        _3 = dataLine[3] ^ dataLine[3+8];
+        _4 = dataLine[4] ^ dataLine[4+8];
+        _5 = dataLine[5] ^ dataLine[5+8];
+        _6 = dataLine[6] ^ dataLine[6+8];
+        _7 = dataLine[7] ^ dataLine[7+8];
+    } else
+    {
+        panic("not implemented yet for lines other than 16B/32B/64B");
+    }
+    // --------------------------------------------------------------------
+    uint64_t XORs =       ((uint64_t) _0) + (((uint64_t) _1) << 8)  + (((uint64_t) _2) << 16) + (((uint64_t) _3) << 24)
+    + (((uint64_t) _4) << 32) + (((uint64_t) _5) << 40) + (((uint64_t) _6) << 48) + (((uint64_t) _7) << 56) ;
+
+    uint64_t hashKey = dataHash->hash(0,XORs) & setMask; // /*<< hashWayBits;*/
+    
+    return hashKey;
+}
+
+void ApproximateDedupBDIHashArray::print() {
+    for (uint32_t i = 0; i < this->numLines; i++) {
+        if (dataPointerArray[i] != -1)
+            info("%i: %lu, %i", i, hashArray[i], dataPointerArray[i]);
+    }
+}
+// BDI and ApproximateBDI End
 
 /* ZCache implementation */
 

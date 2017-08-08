@@ -81,6 +81,18 @@ typedef enum {
     ZSIM_DOUBLE
 } DataType;
 
+typedef enum {
+    ZERO,
+    REPETITIVE,
+    BASE8DELTA1,
+    BASE8DELTA2,
+    BASE8DELTA4,
+    BASE4DELTA1,
+    BASE4DELTA2,
+    BASE2DELTA1,
+    NONE,
+} BDICompressionEncoding;
+
 union DataValue
 {
     uint8_t UINT8;
@@ -105,6 +117,8 @@ const char* AccessTypeName(AccessType t);
 const char* InvTypeName(InvType t);
 const char* MESIStateName(MESIState s);
 const char* DataTypeName(DataType t);
+
+uint16_t BDICompressionToSize(BDICompressionEncoding encoding, uint32_t lineSize);
 
 inline bool IsGet(AccessType t) { return t == GETS || t == GETX; }
 inline bool IsPut(AccessType t) { return t == PUTS || t == PUTX; }

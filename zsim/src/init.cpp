@@ -42,6 +42,9 @@
 #include "ddr_mem.h"
 #include "debug_zsim.h"
 #include "unidoppelganger_cache.h"
+#include "approximatebdi_cache.h"
+#include "approximatededup_cache.h"
+#include "approximatededupbdi_cache.h"
 #include "dramsim_mem_ctrl.h"
 #include "event_queue.h"
 #include "filter_cache.h"
@@ -84,8 +87,10 @@ extern void EndOfPhaseActions(); //in zsim.cpp
  */
 
 BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, uint32_t bankSize, bool isTerminal, uint32_t domain) {
-    if (!zinfo->runningStats) zinfo->runningStats = new g_vector<RunningStats*>();
+    if (!zinfo->compressionRatioStats) zinfo->compressionRatioStats = new g_vector<RunningStats*>();
     if (!zinfo->evictionStats) zinfo->evictionStats = new g_vector<RunningStats*>();
+    if (!zinfo->tagUtilizationStats) zinfo->tagUtilizationStats = new g_vector<RunningStats*>();
+    if (!zinfo->dataUtilizationStats) zinfo->dataUtilizationStats = new g_vector<RunningStats*>();
     string type = config.get<const char*>(prefix + "type", "Simple");
     // Shortcut for TraceDriven type
     if (type == "TraceDriven") {
@@ -107,7 +112,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
     uint32_t candidates = (arrayType == "Z")? config.get<uint32_t>(prefix + "array.candidates", 16) : ways;
 
     //Need to know number of hash functions before instantiating array
-    if (arrayType == "SetAssoc" || arrayType == "uniDoppelganger") {
+    if (arrayType == "SetAssoc" || arrayType == "uniDoppelganger" || arrayType == "ApproximateBDI" || arrayType == "ApproximateDedup" || arrayType == "ApproximateDedupBDI") {
         numHashes = 1;
     } else if (arrayType == "Z") {
         numHashes = ways;
@@ -236,15 +241,53 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
     CacheArray* array = nullptr;
     uniDoppelgangerTagArray* utagArray = nullptr;
     uniDoppelgangerDataArray* udataArray = nullptr;
+    ApproximateBDITagArray* atagArray = nullptr;
+    ApproximateBDIDataArray* adataArray = nullptr;
+    ApproximateDedupTagArray* dtagArray = nullptr;
+    ApproximateDedupDataArray* ddataArray = nullptr;
+    ApproximateDedupHashArray* dhashArray = nullptr;
+    ApproximateDedupBDITagArray* dbtagArray = nullptr;
+    ApproximateDedupBDIDataArray* dbdataArray = nullptr;
+    ApproximateDedupBDIHashArray* dbhashArray = nullptr;
     ReplPolicy* tagRP = nullptr;
     ReplPolicy* dataRP = nullptr;
+    ReplPolicy* hashRP = nullptr;
+    uint32_t tagRatio = config.get<uint32_t>(prefix + "tagRatio", 1);
     if (arrayType == "uniDoppelganger") {
-        tagRP = new LRUReplPolicy<true>(numLines);
-        dataRP = new DataLRUReplPolicy(numLines/2);
-        utagArray = new uniDoppelgangerTagArray(numLines, ways, tagRP, hf);
-        udataArray = new uniDoppelgangerDataArray(numLines/2, ways, dataRP, hf);
-        // tmpRP = new LRUReplPolicy<true>(numLines/2);
-        array = new SetAssocArray();
+        tagRP = new LRUReplPolicy<true>(numLines*tagRatio);
+        dataRP = new DataLRUReplPolicy(numLines);
+        utagArray = new uniDoppelgangerTagArray(numLines*tagRatio, ways, tagRP, hf);
+        udataArray = new uniDoppelgangerDataArray(numLines, ways, dataRP, hf);
+    } else if (arrayType == "ApproximateBDI") {
+        tagRP = new LRUReplPolicy<true>(numLines*tagRatio);
+        dataRP = new DataLRUReplPolicy(numLines);
+        atagArray = new ApproximateBDITagArray(numLines*tagRatio, ways*tagRatio, ways, tagRP, hf);
+        adataArray = new ApproximateBDIDataArray();
+    } else if (arrayType == "ApproximateDedup") {
+        tagRP = new LRUReplPolicy<true>(numLines*tagRatio);
+        dataRP = new DataLRUReplPolicy(numLines);
+        dtagArray = new ApproximateDedupTagArray(numLines*tagRatio, ways, tagRP, hf);
+        ddataArray = new ApproximateDedupDataArray(numLines, ways, dataRP, hf);
+        uint32_t hashLines = config.get<uint32_t>(prefix + "hashLines", 64);
+        uint32_t hashAssoc = config.get<uint32_t>(prefix + "hashAssoc", 8);
+        uint32_t hashSets = hashLines/hashAssoc;
+        hashRP = new DataLRUReplPolicy(hashLines);
+        uint32_t setBits = 31 - __builtin_clz(hashSets);
+        size_t seed = _Fnv_hash_bytes(prefix.c_str(), prefix.size()+1, 0xB4AC5B);
+        H3HashFamily* hashCompression = new H3HashFamily(1, setBits /*hashSetBits*/, 0xCAC7EAFFA1 + seed /*make randSeed depend on prefix*/);
+        dhashArray = new ApproximateDedupHashArray(hashLines, hashAssoc, hashRP, hf, hashCompression);
+    } else if (arrayType == "ApproximateDedupBDI") {
+        tagRP = new LRUReplPolicy<true>(numLines*tagRatio);
+        dbtagArray = new ApproximateDedupBDITagArray(numLines*tagRatio, ways, tagRP, hf);
+        dbdataArray = new ApproximateDedupBDIDataArray(numLines, ways, hf);
+        uint32_t hashLines = config.get<uint32_t>(prefix + "hashLines", 64);
+        uint32_t hashAssoc = config.get<uint32_t>(prefix + "hashAssoc", 8);
+        uint32_t hashSets = hashLines/hashAssoc;
+        hashRP = new DataLRUReplPolicy(hashLines);
+        uint32_t setBits = 31 - __builtin_clz(hashSets);
+        size_t seed = _Fnv_hash_bytes(prefix.c_str(), prefix.size()+1, 0xB4AC5B);
+        H3HashFamily* hashCompression = new H3HashFamily(1, setBits /*hashSetBits*/, 0xCAC7EAFFA1 + seed /*make randSeed depend on prefix*/);
+        dbhashArray = new ApproximateDedupBDIHashArray(hashLines, hashAssoc, hashRP, hf, hashCompression);
     } else if (arrayType == "SetAssoc") {
         array = new SetAssocArray(numLines, ways, rp, hf);
     } else if (arrayType == "Z") {
@@ -279,23 +322,88 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
     if (isTerminal) {
         cc = new MESITerminalCC(numLines, name);
     } else {
-        cc = new MESICC(numLines, nonInclusiveHack, name);
+        cc = new MESICC(numLines*tagRatio, nonInclusiveHack, name);
     }
     rp->setCC(cc);
     if (!isTerminal) {
         if (type == "Simple") {
             cache = new Cache(numLines, cc, array, rp, accLat, invLat, name);
         } else if (type == "uniDoppelganger") {
-            RunningStats* rStats = new RunningStats(name);
-            RunningStats* eStats = new RunningStats(name);
+            g_string statName = name + g_string(" CompressionRatio");
+            RunningStats* crStats = new RunningStats(statName);
+            statName = name + g_string(" EvictionsPerAccess");
+            RunningStats* evStats = new RunningStats(statName);
+            statName = name + g_string(" TagArrayUtilization");
+            RunningStats* tutStats = new RunningStats(statName);
+            statName = name + g_string(" DataArrayUtilization");
+            RunningStats* dutStats = new RunningStats(statName);
             uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
             uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
             tagRP->setCC(cc);
             
-            cache = new uniDoppelgangerCache(numLines, cc, utagArray, udataArray, array, tagRP, dataRP,
-                accLat, invLat, mshrs, ways, timingCandidates, domain, name, rStats, eStats);
-            zinfo->runningStats->push_back(rStats);
-            zinfo->evictionStats->push_back(eStats);
+            cache = new uniDoppelgangerCache(numLines*tagRatio, numLines, cc, utagArray, udataArray, tagRP, dataRP,
+                accLat, invLat, mshrs, ways, timingCandidates, domain, name, crStats, evStats, tutStats, dutStats);
+            zinfo->compressionRatioStats->push_back(crStats);
+            zinfo->evictionStats->push_back(evStats);
+            zinfo->tagUtilizationStats->push_back(tutStats);
+            zinfo->dataUtilizationStats->push_back(dutStats);
+        } else if (type == "ApproximateBDI") {
+            g_string statName = name + g_string(" CompressionRatio");
+            RunningStats* crStats = new RunningStats(statName);
+            statName = name + g_string(" EvictionsPerAccess");
+            RunningStats* evStats = new RunningStats(statName);
+            statName = name + g_string(" TagArrayUtilization");
+            RunningStats* tutStats = new RunningStats(statName);
+            statName = name + g_string(" DataArrayUtilization");
+            RunningStats* dutStats = new RunningStats(statName);
+            uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
+            uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
+            tagRP->setCC(cc);
+            
+            cache = new ApproximateBDICache(numLines*tagRatio, numLines, cc, atagArray, adataArray, tagRP, dataRP,
+                accLat, invLat, mshrs, ways, timingCandidates, domain, name, crStats, evStats, tutStats, dutStats);
+            zinfo->compressionRatioStats->push_back(crStats);
+            zinfo->evictionStats->push_back(evStats);
+            zinfo->tagUtilizationStats->push_back(tutStats);
+            zinfo->dataUtilizationStats->push_back(dutStats);
+        } else if (type == "ApproximateDedup") {
+            g_string statName = name + g_string(" CompressionRatio");
+            RunningStats* crStats = new RunningStats(statName);
+            statName = name + g_string(" EvictionsPerAccess");
+            RunningStats* evStats = new RunningStats(statName);
+            statName = name + g_string(" TagArrayUtilization");
+            RunningStats* tutStats = new RunningStats(statName);
+            statName = name + g_string(" DataArrayUtilization");
+            RunningStats* dutStats = new RunningStats(statName);
+            uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
+            uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
+            tagRP->setCC(cc);
+            
+            cache = new ApproximateDedupCache(numLines*tagRatio, numLines, cc, dtagArray, ddataArray, dhashArray, tagRP, dataRP,
+                hashRP, accLat, invLat, mshrs, ways, timingCandidates, domain, name, crStats, evStats, tutStats, dutStats);
+            zinfo->compressionRatioStats->push_back(crStats);
+            zinfo->evictionStats->push_back(evStats);
+            zinfo->tagUtilizationStats->push_back(tutStats);
+            zinfo->dataUtilizationStats->push_back(dutStats);
+        } else if (type == "ApproximateDedupBDI") {
+            g_string statName = name + g_string(" CompressionRatio");
+            RunningStats* crStats = new RunningStats(statName);
+            statName = name + g_string(" EvictionsPerAccess");
+            RunningStats* evStats = new RunningStats(statName);
+            statName = name + g_string(" TagArrayUtilization");
+            RunningStats* tutStats = new RunningStats(statName);
+            statName = name + g_string(" DataArrayUtilization");
+            RunningStats* dutStats = new RunningStats(statName);
+            uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
+            uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
+            tagRP->setCC(cc);
+            
+            cache = new ApproximateDedupBDICache(numLines*tagRatio, numLines, cc, dbtagArray, dbdataArray, dbhashArray, tagRP, dataRP,
+                hashRP, accLat, invLat, mshrs, ways, timingCandidates, domain, name, crStats, evStats, tutStats, dutStats);
+            zinfo->compressionRatioStats->push_back(crStats);
+            zinfo->evictionStats->push_back(evStats);
+            zinfo->tagUtilizationStats->push_back(tutStats);
+            zinfo->dataUtilizationStats->push_back(dutStats);
         } else if (type == "Timing") {
             uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
             uint32_t tagLat = config.get<uint32_t>(prefix + "tagLat", 5);
@@ -910,6 +1018,8 @@ void SimInit(const char* configFile, const char* outputDir, uint32_t shmid) {
     zinfo->traceDriven = config.get<bool>("sim.traceDriven", false);
     zinfo->approximate = config.get<bool>("sim.approximate", false);
     zinfo->mapSize = config.get<uint32_t>("sim.mapSize", 14);
+    zinfo->floatCutSize = config.get<uint32_t>("sim.floatCutSize", 16);
+    zinfo->doubleCutSize = config.get<uint32_t>("sim.doubleCutSize", 32);
 
     if (zinfo->traceDriven) {
         zinfo->numCores = 0;

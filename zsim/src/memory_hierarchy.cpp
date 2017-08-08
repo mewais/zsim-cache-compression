@@ -50,6 +50,25 @@ const char* DataTypeName(DataType t) {
     return dataTypeNames[t];
 }
 
+uint16_t BDICompressionToSize(BDICompressionEncoding encoding, uint32_t lineSize) {
+    switch(encoding) {
+        case ZERO:
+        case REPETITIVE:
+            return 8;
+        case BASE8DELTA1:
+            return 16;
+        case BASE4DELTA1:
+        case BASE8DELTA2:
+            return 24;
+        case BASE2DELTA1:
+        case BASE4DELTA2:
+        case BASE8DELTA4:
+            return 40;
+        default:
+            return lineSize;
+    }
+}
+
 #include <type_traits>
 
 static inline void CompileTimeAsserts() {

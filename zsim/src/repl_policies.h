@@ -52,6 +52,7 @@ class ReplPolicy : public GlobAlloc {
 
         virtual uint32_t rankCands(const MemReq* req, SetAssocCands cands) = 0;
         virtual uint32_t rankCands(const MemReq* req, ZCands cands) = 0;
+        virtual uint32_t rank(const MemReq* req, SetAssocCands cands, g_vector<uint32_t>& exceptions) = 0;
 
         virtual void initStats(AggregateStat* parent) {}
 };
@@ -88,6 +89,8 @@ class LegacyReplPolicy : public virtual ReplPolicy {
             return getBestCandidate();
         }
 
+        uint32_t rank(const MemReq* req, SetAssocCands cands, g_vector<uint32_t>& exceptions) {panic("No"); return 0;}
+
         DECL_RANK_BINDINGS;
 };
 
@@ -122,6 +125,25 @@ class LRUReplPolicy : public ReplPolicy {
             uint32_t bestCand = -1;
             uint64_t bestScore = (uint64_t)-1L;
             for (auto ci = cands.begin(); ci != cands.end(); ci.inc()) {
+                uint32_t s = score(*ci);
+                bestCand = (s < bestScore)? *ci : bestCand;
+                bestScore = MIN(s, bestScore);
+            }
+            return bestCand;
+        }
+
+        inline uint32_t rank(const MemReq* req, SetAssocCands cands, g_vector<uint32_t>& exceptions) {
+            uint32_t bestCand = -1;
+            uint64_t bestScore = (uint64_t)-1L;
+            for (SetAssocCands::iterator ci = cands.begin(); ci != cands.end(); ci.inc()) {
+                bool Found = false;
+                for (uint32_t i = 0; i < exceptions.size(); i++)
+                    if (ci.x == exceptions[i]) {
+                        Found = true;
+                        break;
+                    }
+                if (Found)
+                    continue;
                 uint32_t s = score(*ci);
                 bestCand = (s < bestScore)? *ci : bestCand;
                 bestScore = MIN(s, bestScore);
@@ -179,6 +201,8 @@ class DataLRUReplPolicy : public ReplPolicy {
             }
             return bestCand;
         }
+
+        uint32_t rank(const MemReq* req, SetAssocCands cands, g_vector<uint32_t>& exceptions) {panic("No"); return 0;}
 
         DECL_RANK_BINDINGS;
 

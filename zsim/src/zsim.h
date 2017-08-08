@@ -141,8 +141,10 @@ struct GlobSimInfo {
 
     AggregateStat* rootStat;
     g_vector<StatsBackend*>* statsBackends; // used for termination dumps
-    g_vector<RunningStats*>* runningStats;
+    g_vector<RunningStats*>* compressionRatioStats;
     g_vector<RunningStats*>* evictionStats;
+    g_vector<RunningStats*>* tagUtilizationStats;
+    g_vector<RunningStats*>* dataUtilizationStats;
     StatsBackend* periodicStatsBackend;
     StatsBackend* eventualStatsBackend;
     ProcessStats* processStats;
@@ -194,6 +196,9 @@ struct GlobSimInfo {
     // start, end, type, min, max
     g_vector<std::tuple<uint64_t, uint64_t, DataType, DataValue, DataValue>>* approximateRegions;
     g_unordered_map<uint64_t, uint64_t>* realAddresses;
+
+    uint32_t floatCutSize;
+    uint32_t doubleCutSize;
 };
 
 

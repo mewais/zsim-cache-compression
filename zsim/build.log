@@ -1,0 +1,634 @@
+scons: Reading SConscript files ...
+Building opt zsim at build/opt
+scons: done reading SConscript files.
+scons: Building targets ...
+g++ -o build/opt/approximatebdi_cache.os -c -fPIC -march=core2 -g -O3 -funroll-loops -g -std=c++0x -Wall -Wno-unknown-pragmas -fomit-frame-pointer -fno-stack-protector -MMD -DBIGARRAY_MULTIPLIER=1 -DUSING_XED -DTARGET_IA32E -DHOST_IA32E -fPIC -DTARGET_LINUX -Werror -DPIN_PATH="/data/mewais/Work/pin/intel64/bin/pinbin" -DZSIM_PATH="/data/mewais/Work/Doppelganger/zsim/build/opt/libzsim.so" -DMT_SAFE_LOG -I/data/mewais/Work/pin/extras/xed-intel64/include -I/data/mewais/Work/pin/source/include/pin -I/data/mewais/Work/pin/source/include/pin/gen -I/data/mewais/Work/pin/extras/components/include -Ibuild/opt build/opt/approximatebdi_cache.cpp
+g++ -o build/opt/cache.os -c -fPIC -march=core2 -g -O3 -funroll-loops -g -std=c++0x -Wall -Wno-unknown-pragmas -fomit-frame-pointer -fno-stack-protector -MMD -DBIGARRAY_MULTIPLIER=1 -DUSING_XED -DTARGET_IA32E -DHOST_IA32E -fPIC -DTARGET_LINUX -Werror -DPIN_PATH="/data/mewais/Work/pin/intel64/bin/pinbin" -DZSIM_PATH="/data/mewais/Work/Doppelganger/zsim/build/opt/libzsim.so" -DMT_SAFE_LOG -I/data/mewais/Work/pin/extras/xed-intel64/include -I/data/mewais/Work/pin/source/include/pin -I/data/mewais/Work/pin/source/include/pin/gen -I/data/mewais/Work/pin/extras/components/include -Ibuild/opt build/opt/cache.cpp
+g++ -o build/opt/cache_arrays.os -c -fPIC -march=core2 -g -O3 -funroll-loops -g -std=c++0x -Wall -Wno-unknown-pragmas -fomit-frame-pointer -fno-stack-protector -MMD -DBIGARRAY_MULTIPLIER=1 -DUSING_XED -DTARGET_IA32E -DHOST_IA32E -fPIC -DTARGET_LINUX -Werror -DPIN_PATH="/data/mewais/Work/pin/intel64/bin/pinbin" -DZSIM_PATH="/data/mewais/Work/Doppelganger/zsim/build/opt/libzsim.so" -DMT_SAFE_LOG -I/data/mewais/Work/pin/extras/xed-intel64/include -I/data/mewais/Work/pin/source/include/pin -I/data/mewais/Work/pin/source/include/pin/gen -I/data/mewais/Work/pin/extras/components/include -Ibuild/opt build/opt/cache_arrays.cpp
+g++ -o build/opt/coherence_ctrls.os -c -fPIC -march=core2 -g -O3 -funroll-loops -g -std=c++0x -Wall -Wno-unknown-pragmas -fomit-frame-pointer -fno-stack-protector -MMD -DBIGARRAY_MULTIPLIER=1 -DUSING_XED -DTARGET_IA32E -DHOST_IA32E -fPIC -DTARGET_LINUX -Werror -DPIN_PATH="/data/mewais/Work/pin/intel64/bin/pinbin" -DZSIM_PATH="/data/mewais/Work/Doppelganger/zsim/build/opt/libzsim.so" -DMT_SAFE_LOG -I/data/mewais/Work/pin/extras/xed-intel64/include -I/data/mewais/Work/pin/source/include/pin -I/data/mewais/Work/pin/source/include/pin/gen -I/data/mewais/Work/pin/extras/components/include -Ibuild/opt build/opt/coherence_ctrls.cpp
+In file included from build/opt/cache.h:34:0,
+                 from build/opt/cache.cpp:26:
+build/opt/repl_policies.h:65:0: error: "DECL_RANK_BINDING" redefined [-Werror]
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+ ^
+build/opt/repl_policies.h:64:0: note: this is the location of the previous definition
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands) { return rank(req, cands); }
+ ^
+In file included from build/opt/cache.h:34:0,
+                 from build/opt/timing_cache.h:30,
+                 from build/opt/approximatebdi_cache.h:4,
+                 from build/opt/approximatebdi_cache.cpp:1:
+build/opt/repl_policies.h:65:0: error: "DECL_RANK_BINDING" redefined [-Werror]
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+ ^
+build/opt/repl_policies.h:64:0: note: this is the location of the previous definition
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands) { return rank(req, cands); }
+ ^
+In file included from build/opt/cache.h:34:0,
+                 from build/opt/coherence_ctrls.cpp:27:
+build/opt/repl_policies.h:65:0: error: "DECL_RANK_BINDING" redefined [-Werror]
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+ ^
+build/opt/repl_policies.h:64:0: note: this is the location of the previous definition
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands) { return rank(req, cands); }
+ ^
+In file included from build/opt/cache_arrays.cpp:30:0:
+build/opt/repl_policies.h:65:0: error: "DECL_RANK_BINDING" redefined [-Werror]
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+ ^
+build/opt/repl_policies.h:64:0: note: this is the location of the previous definition
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands) { return rank(req, cands); }
+ ^
+In file included from build/opt/cache.h:34:0,
+                 from build/opt/cache.cpp:26:
+build/opt/repl_policies.h: In member function ‘uint32_t LegacyReplPolicy::rankCands(const MemReq*, SetAssocCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘LegacyReplPolicy::rank(const MemReq*&, SetAssocCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:84:47: note: template<class C> uint32_t LegacyReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:84:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h: In member function ‘uint32_t LegacyReplPolicy::rankCands(const MemReq*, ZCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘LegacyReplPolicy::rank(const MemReq*&, ZCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:84:47: note: template<class C> uint32_t LegacyReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:84:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h: In member function ‘uint32_t DataLRUReplPolicy::rankCands(const MemReq*, SetAssocCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘DataLRUReplPolicy::rank(const MemReq*&, SetAssocCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:186:47: note: template<class C> uint32_t DataLRUReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:186:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h: In member function ‘uint32_t DataLRUReplPolicy::rankCands(const MemReq*, ZCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘DataLRUReplPolicy::rank(const MemReq*&, ZCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:186:47: note: template<class C> uint32_t DataLRUReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:186:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+In file included from build/opt/cache.h:34:0,
+                 from build/opt/coherence_ctrls.cpp:27:
+build/opt/repl_policies.h: In member function ‘uint32_t LegacyReplPolicy::rankCands(const MemReq*, SetAssocCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘LegacyReplPolicy::rank(const MemReq*&, SetAssocCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:84:47: note: template<class C> uint32_t LegacyReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:84:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h: In member function ‘uint32_t LegacyReplPolicy::rankCands(const MemReq*, ZCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘LegacyReplPolicy::rank(const MemReq*&, ZCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:84:47: note: template<class C> uint32_t LegacyReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:84:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h: In member function ‘uint32_t DataLRUReplPolicy::rankCands(const MemReq*, SetAssocCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘DataLRUReplPolicy::rank(const MemReq*&, SetAssocCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:186:47: note: template<class C> uint32_t DataLRUReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:186:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h: In member function ‘uint32_t DataLRUReplPolicy::rankCands(const MemReq*, ZCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘DataLRUReplPolicy::rank(const MemReq*&, ZCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:186:47: note: template<class C> uint32_t DataLRUReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:186:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+In file included from build/opt/cache_arrays.cpp:30:0:
+build/opt/repl_policies.h: In member function ‘uint32_t LegacyReplPolicy::rankCands(const MemReq*, SetAssocCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘LegacyReplPolicy::rank(const MemReq*&, SetAssocCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:84:47: note: template<class C> uint32_t LegacyReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:84:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h: In member function ‘uint32_t LegacyReplPolicy::rankCands(const MemReq*, ZCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘LegacyReplPolicy::rank(const MemReq*&, ZCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:84:47: note: template<class C> uint32_t LegacyReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:84:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h: In member function ‘uint32_t DataLRUReplPolicy::rankCands(const MemReq*, SetAssocCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘DataLRUReplPolicy::rank(const MemReq*&, SetAssocCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:186:47: note: template<class C> uint32_t DataLRUReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:186:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h: In member function ‘uint32_t DataLRUReplPolicy::rankCands(const MemReq*, ZCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘DataLRUReplPolicy::rank(const MemReq*&, ZCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:186:47: note: template<class C> uint32_t DataLRUReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:186:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+In file included from build/opt/cache.h:34:0,
+                 from build/opt/timing_cache.h:30,
+                 from build/opt/approximatebdi_cache.h:4,
+                 from build/opt/approximatebdi_cache.cpp:1:
+build/opt/repl_policies.h: In member function ‘uint32_t LegacyReplPolicy::rankCands(const MemReq*, SetAssocCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘LegacyReplPolicy::rank(const MemReq*&, SetAssocCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:84:47: note: template<class C> uint32_t LegacyReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:84:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h: In member function ‘uint32_t LegacyReplPolicy::rankCands(const MemReq*, ZCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘LegacyReplPolicy::rank(const MemReq*&, ZCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:84:47: note: template<class C> uint32_t LegacyReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:84:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:92:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h: In member function ‘uint32_t DataLRUReplPolicy::rankCands(const MemReq*, SetAssocCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘DataLRUReplPolicy::rank(const MemReq*&, SetAssocCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:186:47: note: template<class C> uint32_t DataLRUReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:186:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:28: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                            ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h: In member function ‘uint32_t DataLRUReplPolicy::rankCands(const MemReq*, ZCands, g_vector<unsigned int>)’:
+build/opt/repl_policies.h:65:144: error: no matching function for call to ‘DataLRUReplPolicy::rank(const MemReq*&, ZCands&, g_vector<unsigned int>&)’
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:65:144: note: candidate is:
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/repl_policies.h:186:47: note: template<class C> uint32_t DataLRUReplPolicy::rank(const MemReq*, C)
+         template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+                                               ^
+build/opt/repl_policies.h:186:47: note:   template argument deduction/substitution failed:
+build/opt/repl_policies.h:65:144: note:   candidate expects 2 arguments, 3 provided
+ #define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, g_vector<uint32_t> exceptions) { return rank(req, cands, exceptions); }
+                                                                                                                                                ^
+build/opt/repl_policies.h:66:62: note: in expansion of macro ‘DECL_RANK_BINDING’
+ #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
+                                                              ^
+build/opt/repl_policies.h:197:9: note: in expansion of macro ‘DECL_RANK_BINDINGS’
+         DECL_RANK_BINDINGS;
+         ^
+build/opt/cache_arrays.cpp: In member function ‘int32_t ApproximateBDITagArray::needEviction(Address, const MemReq*, uint16_t, g_vector<unsigned int>, Address*)’:
+build/opt/cache_arrays.cpp:564:98: error: no matching function for call to ‘ReplPolicy::rankCands(const MemReq*&, SetAssocCands, g_vector<unsigned int>&)’
+         uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc), alreadyEvicted);
+                                                                                                  ^
+build/opt/cache_arrays.cpp:564:98: note: candidates are:
+In file included from build/opt/cache_arrays.cpp:30:0:
+build/opt/repl_policies.h:53:26: note: virtual uint32_t ReplPolicy::rankCands(const MemReq*, SetAssocCands)
+         virtual uint32_t rankCands(const MemReq* req, SetAssocCands cands) = 0;
+                          ^
+build/opt/repl_policies.h:53:26: note:   candidate expects 2 arguments, 3 provided
+build/opt/repl_policies.h:54:26: note: virtual uint32_t ReplPolicy::rankCands(const MemReq*, ZCands)
+         virtual uint32_t rankCands(const MemReq* req, ZCands cands) = 0;
+                          ^
+build/opt/repl_policies.h:54:26: note:   candidate expects 2 arguments, 3 provided
+cc1plus: all warnings being treated as errors
+build/opt/approximatebdi_cache.cpp: In member function ‘virtual uint64_t ApproximateBDICache::access(MemReq&)’:
+build/opt/approximatebdi_cache.cpp:131:100: error: no matching function for call to ‘ApproximateBDITagArray::needEviction(Address&, MemReq*, uint16_t&, Address*)’
+             int32_t victimTagId2 = tagArray->needEviction(req.lineAddr, &req, lineSize, &wbLineAddr);
+                                                                                                    ^
+build/opt/approximatebdi_cache.cpp:131:100: note: candidate is:
+In file included from build/opt/cache.h:29:0,
+                 from build/opt/timing_cache.h:30,
+                 from build/opt/approximatebdi_cache.h:4,
+                 from build/opt/approximatebdi_cache.cpp:1:
+build/opt/cache_arrays.h:175:17: note: int32_t ApproximateBDITagArray::needEviction(Address, const MemReq*, uint16_t, g_vector<unsigned int>, Address*)
+         int32_t needEviction(Address lineAddr, const MemReq* req, uint16_t size, g_vector<uint32_t> alreadyEvicted, Address* wbLineAddr);
+                 ^
+build/opt/cache_arrays.h:175:17: note:   candidate expects 5 arguments, 4 provided
+build/opt/approximatebdi_cache.cpp:148:96: error: no matching function for call to ‘ApproximateBDITagArray::needEviction(Address&, MemReq*, uint16_t&, Address*)’
+                 victimTagId2 = tagArray->needEviction(req.lineAddr, &req, lineSize, &wbLineAddr);
+                                                                                                ^
+build/opt/approximatebdi_cache.cpp:148:96: note: candidate is:
+In file included from build/opt/cache.h:29:0,
+                 from build/opt/timing_cache.h:30,
+                 from build/opt/approximatebdi_cache.h:4,
+                 from build/opt/approximatebdi_cache.cpp:1:
+build/opt/cache_arrays.h:175:17: note: int32_t ApproximateBDITagArray::needEviction(Address, const MemReq*, uint16_t, g_vector<unsigned int>, Address*)
+         int32_t needEviction(Address lineAddr, const MemReq* req, uint16_t size, g_vector<uint32_t> alreadyEvicted, Address* wbLineAddr);
+                 ^
+build/opt/cache_arrays.h:175:17: note:   candidate expects 5 arguments, 4 provided
+build/opt/approximatebdi_cache.cpp:212:107: error: no matching function for call to ‘ApproximateBDITagArray::needEviction(Address&, MemReq*, uint16_t&, Address*)’
+                     int32_t victimTagId = tagArray->needEviction(req.lineAddr, &req, lineSize, &wbLineAddr);
+                                                                                                           ^
+build/opt/approximatebdi_cache.cpp:212:107: note: candidate is:
+In file included from build/opt/cache.h:29:0,
+                 from build/opt/timing_cache.h:30,
+                 from build/opt/approximatebdi_cache.h:4,
+                 from build/opt/approximatebdi_cache.cpp:1:
+build/opt/cache_arrays.h:175:17: note: int32_t ApproximateBDITagArray::needEviction(Address, const MemReq*, uint16_t, g_vector<unsigned int>, Address*)
+         int32_t needEviction(Address lineAddr, const MemReq* req, uint16_t size, g_vector<uint32_t> alreadyEvicted, Address* wbLineAddr);
+                 ^
+build/opt/cache_arrays.h:175:17: note:   candidate expects 5 arguments, 4 provided
+build/opt/approximatebdi_cache.cpp:229:103: error: no matching function for call to ‘ApproximateBDITagArray::needEviction(Address&, MemReq*, uint16_t&, Address*)’
+                         victimTagId = tagArray->needEviction(req.lineAddr, &req, lineSize, &wbLineAddr);
+                                                                                                       ^
+build/opt/approximatebdi_cache.cpp:229:103: note: candidate is:
+In file included from build/opt/cache.h:29:0,
+                 from build/opt/timing_cache.h:30,
+                 from build/opt/approximatebdi_cache.h:4,
+                 from build/opt/approximatebdi_cache.cpp:1:
+build/opt/cache_arrays.h:175:17: note: int32_t ApproximateBDITagArray::needEviction(Address, const MemReq*, uint16_t, g_vector<unsigned int>, Address*)
+         int32_t needEviction(Address lineAddr, const MemReq* req, uint16_t size, g_vector<uint32_t> alreadyEvicted, Address* wbLineAddr);
+                 ^
+build/opt/cache_arrays.h:175:17: note:   candidate expects 5 arguments, 4 provided
+scons: *** [build/opt/cache_arrays.os] Error 1
+cc1plus: all warnings being treated as errors
+cc1plus: all warnings being treated as errors
+scons: *** [build/opt/cache.os] Error 1
+scons: *** [build/opt/coherence_ctrls.os] Error 1
+cc1plus: all warnings being treated as errors
+scons: *** [build/opt/approximatebdi_cache.os] Error 1
+scons: building terminated because of errors.

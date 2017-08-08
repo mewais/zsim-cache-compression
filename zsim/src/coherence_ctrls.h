@@ -351,6 +351,7 @@ class MESICC : public CC {
             //invalidations. The alternative with this would be to capture these blocks, since we have space anyway. This is so rare is doesn't matter,
             //but if we do proper NI/EX mid-level caches backed by directories, this may start becoming more common (and it is perfectly acceptable to
             //upgrade without any interaction with the parent... the child had the permissions!)
+            // info("%i, %s, %i", lineId, AccessTypeName(req.type), bcc->isValid(lineId));
             if (lineId == -1 || (((req.type == PUTS) || (req.type == PUTX)) && !bcc->isValid(lineId))) { //can only be a non-inclusive wback
                 assert(nonInclusiveHack);
                 assert((req.type == PUTS) || (req.type == PUTX));

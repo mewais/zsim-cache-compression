@@ -50,6 +50,7 @@ class IdealLRUArray : public CacheArray {
                 void update(uint32_t id, const MemReq* req) {panic("!")}
                 void replaced(uint32_t id) {panic("!!");}
                 template <typename C> uint32_t rank(const MemReq* req, C cands) {panic("!!!");}
+                uint32_t rank(const MemReq* req, SetAssocCands cands, g_vector<uint32_t>& exceptions) {panic("No"); return 0;}
                 void initStats(AggregateStat* parent) {}
                 DECL_RANK_BINDINGS
         };
@@ -236,6 +237,7 @@ class IdealLRUPartReplPolicy : public PartReplPolicy {
         }
 
         template <typename C> uint32_t rank(const MemReq* req, C cands) {panic("!!");}
+        uint32_t rank(const MemReq* req, SetAssocCands cands, g_vector<uint32_t>& exceptions) {panic("No"); return 0;}
         DECL_RANK_BINDINGS;
 };
 
