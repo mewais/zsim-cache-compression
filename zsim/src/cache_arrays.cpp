@@ -1051,13 +1051,13 @@ void ApproximateDedupHashArray::approximate(const DataLine data, DataType type) 
         for (uint16_t i = 0; i < zinfo->lineSize/4; i++)
         {
             ((uint32_t*) data)[i] = ((uint32_t*) data)[i] >> zinfo->floatCutSize;
-            ((uint32_t*) data)[i] = ((uint32_t*) data)[i] << zinfo->floatCutSize;
+            // ((uint32_t*) data)[i] = ((uint32_t*) data)[i] << zinfo->floatCutSize;
         }
     } else if (type == ZSIM_DOUBLE) {
         for (uint16_t i = 0; i < zinfo->lineSize/8; i++)
         {
             ((uint64_t*) data)[i] = ((uint64_t*) data)[i] >> zinfo->doubleCutSize;
-            ((uint64_t*) data)[i] = ((uint64_t*) data)[i] << zinfo->doubleCutSize;
+            // ((uint64_t*) data)[i] = ((uint64_t*) data)[i] << zinfo->doubleCutSize;
         }
     } else {
         panic("We only approximate floats and doubles");
@@ -1491,13 +1491,13 @@ void ApproximateDedupBDIHashArray::approximate(const DataLine data, DataType typ
         for (uint16_t i = 0; i < zinfo->lineSize/4; i++)
         {
             ((uint32_t*) data)[i] = ((uint32_t*) data)[i] >> zinfo->floatCutSize;
-            ((uint32_t*) data)[i] = ((uint32_t*) data)[i] << zinfo->floatCutSize;
+            // ((uint32_t*) data)[i] = ((uint32_t*) data)[i] << zinfo->floatCutSize;
         }
     } else if (type == ZSIM_DOUBLE) {
         for (uint16_t i = 0; i < zinfo->lineSize/8; i++)
         {
             ((uint64_t*) data)[i] = ((uint64_t*) data)[i] >> zinfo->doubleCutSize;
-            ((uint64_t*) data)[i] = ((uint64_t*) data)[i] << zinfo->doubleCutSize;
+            // ((uint64_t*) data)[i] = ((uint64_t*) data)[i] << zinfo->doubleCutSize;
         }
     } else {
         panic("We only approximate floats and doubles");

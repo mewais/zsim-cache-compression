@@ -159,7 +159,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
             if(approximate)
                 hashArray->approximate(data, type);
             uint64_t hash = hashArray->hash(data);
-            int32_t hashId = hashArray->lookup(hash, &req, updateReplacement);
+            int32_t hashId = hashArray->lookup(hash, &req, false);
             if (hashId != -1) {
                 // info("Found a matching hash, proceeding to match the full line.");
                 int32_t dataId = hashArray->readDataPointer(hashId);
@@ -168,7 +168,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, dataId, -1, true, true);
                     // info("postinsert %i", victimTagId);
                     dataArray->postinsert(victimTagId, &req, 1, dataId, true, data, true);
-                    // hashArray->postinsert(hash, &req, victimDataId, hashId, true);
+                    hashArray->postinsert(hash, &req, victimDataId, hashId, true);
                     assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
                     mse = new (evRec) MissStartEvent(this, accLat, domain);
                     // // info("uCREATE: %p at %u", mse, __LINE__);
@@ -206,6 +206,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, dataId, oldListHead, true, updateReplacement);
                     // info("postinsert %i", victimTagId);
                     dataArray->postinsert(victimTagId, &req, dataCounter+1, dataId, true, NULL, updateReplacement);
+                    hashArray->postinsert(hash, &req, victimDataId, hashId, true);
 
                     assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
 
@@ -259,7 +260,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, victimDataId, -1, true, updateReplacement);
                     // info("postinsert %i", victimTagId);
                     dataArray->postinsert(victimTagId, &req, 1, victimDataId, true, data, updateReplacement);
-                    // hashArray->postinsert(hash, &req, victimDataId, hashId, true);
+                    hashArray->postinsert(hash, &req, victimDataId, hashId, true);
                     assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
                     mse = new (evRec) MissStartEvent(this, accLat, domain);
                     // // info("uCREATE: %p at %u", mse, __LINE__);
@@ -359,7 +360,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
             if(approximate)
                 hashArray->approximate(data, type);
             uint64_t hash = hashArray->hash(data);
-            int32_t hashId = hashArray->lookup(hash, &req, updateReplacement);
+            int32_t hashId = hashArray->lookup(hash, &req, false);
             int32_t dataId = tagArray->readDataId(tagId);
 
             if (req.type == PUTX && !dataArray->isSame(dataId, data)) {
@@ -373,7 +374,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         tagArray->postinsert(req.lineAddr, &req, tagId, dataId, -1, true, true);
                         // info("postinsert %i", tagId);
                         dataArray->postinsert(tagId, &req, 1, dataId, true, data, true);
-                        // hashArray->postinsert(hash, &req, victimDataId, hashId, true);
+                        hashArray->postinsert(hash, &req, dataId, hashId, true);
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -408,6 +409,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         tagArray->postinsert(req.lineAddr, &req, tagId, dataId, oldListHead, true, updateReplacement);
                         // info("postinsert %i", tagId);
                         dataArray->postinsert(tagId, &req, dataCounter+1, dataId, true, NULL, updateReplacement);
+                        hashArray->postinsert(hash, &req, dataId, hashId, true);
 
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
@@ -441,6 +443,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             // Data only exists once, just update.
                             // info("PUTX only once.");
                             dataArray->writeData(dataId, data, &req, true);
+                            hashArray->postinsert(hash, &req, dataId, hashId, true);
                             uint64_t getDoneCycle = respCycle;
                             respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -494,6 +497,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             tagArray->changeInPlace(req.lineAddr, &req, tagId, victimDataId, -1, true, false);
                             // info("changeInPlace %i", tagId);
                             dataArray->postinsert(tagId, &req, 1, victimDataId, true, data, updateReplacement);
+                            hashArray->postinsert(hash, &req, victimDataId, hashId, true);
                             respCycle += accLat;
 
                             uint64_t getDoneCycle = respCycle;
@@ -529,6 +533,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         // Data only exists once, just update.
                         // info("PUTX only once.");
                         dataArray->writeData(dataId, data, &req, true);
+                        hashArray->postinsert(hash, &req, dataId, hashId, true);
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -581,6 +586,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         tagArray->changeInPlace(req.lineAddr, &req, tagId, victimDataId, -1, true, false);
                         // info("changeInPlace %i", tagId);
                         dataArray->postinsert(tagId, &req, 1, victimDataId, true, data, updateReplacement);
+                        hashArray->postinsert(hash, &req, victimDataId, hashId, true);
                         respCycle += accLat;
 
                         uint64_t getDoneCycle = respCycle;

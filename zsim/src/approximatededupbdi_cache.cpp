@@ -159,7 +159,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
             if(approximate)
                 hashArray->approximate(data, type);
             uint64_t hash = hashArray->hash(data);
-            int32_t hashId = hashArray->lookup(hash, &req, updateReplacement);
+            int32_t hashId = hashArray->lookup(hash, &req, false);
             uint16_t lineSize = 0;
             BDICompressionEncoding encoding = dataArray->compress(data, &lineSize);
 
@@ -172,7 +172,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, dataId, segmentId, encoding, -1, true);
                     // info(""postinsert %i", victimTagId);
                     dataArray->postinsert(victimTagId, &req, 1, dataId, segmentId, data);
-                    // hashArray->postinsert(hash, &req, victimDataId, hashId, true);
+                    hashArray->postinsert(hash, &req, dataId, segmentId, hashId, true);
                     assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
                     mse = new (evRec) MissStartEvent(this, accLat, domain);
                     // // info(""uCREATE: %p at %u", mse, __LINE__);
@@ -210,6 +210,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, dataId, segmentId, encoding, oldListHead, true);
                     // info(""postinsert %i", victimTagId);
                     dataArray->postinsert(victimTagId, &req, dataCounter+1, dataId, segmentId, NULL);
+                    hashArray->postinsert(hash, &req, dataId, segmentId, hashId, true);
 
                     assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
 
@@ -235,13 +236,13 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                 } else {
                     // info(""Data is different, Collision.");
                     // Select data to evict
-                    evictCycle = respCycle + 2*accLat;
+                    evictCycle = respCycle + accLat;
                     int32_t victimDataId = dataArray->preinsert();
 
                     // Now we need to know the available space in this set.
                     uint16_t freeSpace = 0;
                     g_vector<uint32_t> keptFromEvictions;
-                    uint64_t lastEvDoneCycle = respCycle;
+                    uint64_t lastEvDoneCycle = evictCycle;
                     while (freeSpace < lineSize) {
                         uint16_t occupiedSpace = 0;
                         for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
@@ -251,7 +252,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         int32_t victimListHeadId;
                         int32_t victimSegmentId = dataArray->preinsert(victimDataId, &victimListHeadId, keptFromEvictions);
                         keptFromEvictions.push_back(victimSegmentId);
-                        evictCycle = respCycle + 2*accLat;
+                        evictCycle = respCycle + accLat;
                         uint64_t evBeginCycle = evictCycle;
                         TimingRecord writebackRecord;
                         lastEvDoneCycle = tagEvDoneCycle;
@@ -278,7 +279,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, victimDataId, keptFromEvictions[0], encoding, -1, true);
                     // info(""postinsert %i", victimTagId);
                     dataArray->postinsert(victimTagId, &req, 1, victimDataId, keptFromEvictions[0], data);
-                    // hashArray->postinsert(hash, &req, victimDataId, hashId, true);
+                    hashArray->postinsert(hash, &req, victimDataId, keptFromEvictions[0], hashId, true);
                     assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
                     mse = new (evRec) MissStartEvent(this, accLat, domain);
                     // // info(""uCREATE: %p at %u", mse, __LINE__);
@@ -312,14 +313,14 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
             } else {
                 // info(""Hash is different, nothing similar.");
                 // Select data to evict
-                evictCycle = respCycle + 2*accLat;
+                evictCycle = respCycle + accLat;
                 int32_t victimDataId = dataArray->preinsert();
                 int32_t victimHashId = hashArray->preinsert(hash, &req);
 
                 // Now we need to know the available space in this set.
                 uint16_t freeSpace = 0;
                 g_vector<uint32_t> keptFromEvictions;
-                uint64_t lastEvDoneCycle = respCycle;
+                uint64_t lastEvDoneCycle = evictCycle;
                 while (freeSpace < lineSize) {
                     uint16_t occupiedSpace = 0;
                     for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
@@ -329,7 +330,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     int32_t victimListHeadId;
                     int32_t victimSegmentId = dataArray->preinsert(victimDataId, &victimListHeadId, keptFromEvictions);
                     keptFromEvictions.push_back(victimSegmentId);
-                    evictCycle = respCycle + 2*accLat;
+                    evictCycle = respCycle + accLat;
                     uint64_t evBeginCycle = evictCycle;
                     TimingRecord writebackRecord;
                     lastEvDoneCycle = tagEvDoneCycle;
@@ -413,6 +414,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         tagArray->postinsert(req.lineAddr, &req, tagId, dataId, segmentId, encoding, -1, true);
                         // info(""postinsert %i", tagId);
                         dataArray->postinsert(tagId, &req, 1, dataId, segmentId, data);
+                        hashArray->postinsert(hash, &req, dataId, segmentId, hashId, true);
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -429,6 +431,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         tagArray->postinsert(req.lineAddr, &req, tagId, dataId, segmentId, encoding, oldListHead, true);
                         // info(""postinsert %i", tagId);
                         dataArray->postinsert(tagId, &req, dataCounter+1, dataId, segmentId, NULL);
+                        hashArray->postinsert(hash, &req, dataId, segmentId, hashId, true);
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -444,14 +447,12 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         if (dataArray->readCounter(dataId, segmentId) == 1) {
                             // Data only exists once, just update.
                             // info(""PUTX only once.");
-
                             int32_t victimDataId = dataId;
-
                             // Now we need to know the available space in this set
                             uint16_t freeSpace = 0;
                             g_vector<uint32_t> keptFromEvictions;
                             keptFromEvictions.push_back(segmentId);
-                            uint64_t lastEvDoneCycle = respCycle;
+                            uint64_t lastEvDoneCycle = evictCycle;
                             while (freeSpace < lineSize) {
                                 uint16_t occupiedSpace = 0;
                                 for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
@@ -461,10 +462,9 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 int32_t victimListHeadId;
                                 int32_t victimSegmentId = dataArray->preinsert(victimDataId, &victimListHeadId, keptFromEvictions);
                                 keptFromEvictions.push_back(victimSegmentId);
-                                evictCycle = respCycle + 2*accLat;
+                                evictCycle = respCycle + accLat;
                                 uint64_t evBeginCycle = evictCycle;
                                 TimingRecord writebackRecord;
-                                lastEvDoneCycle = tagEvDoneCycle;
                                 while (victimListHeadId != -1) {
                                     Address wbLineAddr = tagArray->readAddress(victimListHeadId);
                                     // info(""\t\tEvicting tagId: %i, %lu", victimListHeadId, wbLineAddr);
@@ -488,6 +488,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
 
                             dataArray->writeData(dataId, segmentId, data, &req, true);
                             tagArray->writeCompressionEncoding(tagId, encoding);
+                            hashArray->postinsert(hash, &req, dataId, segmentId, hashId, true);
                             uint64_t getDoneCycle = respCycle;
                             respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -525,7 +526,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             }
 
                             evictCycle = respCycle + accLat;
-                            respCycle += 2*accLat;
+                            respCycle += accLat;
                             int32_t victimDataId = dataArray->preinsert();
 
                             // Now we need to know the available space in this set
@@ -544,7 +545,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 evictCycle = respCycle + 2*accLat;
                                 uint64_t evBeginCycle = evictCycle;
                                 TimingRecord writebackRecord;
-                                lastEvDoneCycle = tagEvDoneCycle;
+                                lastEvDoneCycle = evictCycle;
                                 while (victimListHeadId != -1) {
                                     Address wbLineAddr = tagArray->readAddress(victimListHeadId);
                                     // info(""\t\tEvicting tagId: %i, %lu", victimListHeadId, wbLineAddr);
@@ -568,7 +569,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, true);
                             // info(""postinsert %i", tagId);
                             dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data);
-                            respCycle += accLat;
+                            hashArray->postinsert(hash, &req, victimDataId, keptFromEvictions[0], hashId, true);
 
                             uint64_t getDoneCycle = respCycle;
                             respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
@@ -603,6 +604,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         // Data only exists once, just update.
                         // info(""PUTX only once.");
                         dataArray->writeData(dataId, segmentId, data, &req, true);
+                        hashArray->postinsert(hash, &req, dataId, segmentId, hashId, true);
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -624,13 +626,13 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         }
 
                         evictCycle = respCycle + accLat;
-                        respCycle += 2*accLat;
+                        respCycle += accLat;
                         int32_t victimDataId = dataArray->preinsert();
 
                         // Now we need to know the available space in this set
                         uint16_t freeSpace = 0;
                         g_vector<uint32_t> keptFromEvictions;
-                        uint64_t lastEvDoneCycle = respCycle;
+                        uint64_t lastEvDoneCycle = evictCycle;
                         while (freeSpace < lineSize) {
                             uint16_t occupiedSpace = 0;
                             for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
@@ -640,7 +642,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             int32_t victimListHeadId;
                             int32_t victimSegmentId = dataArray->preinsert(victimDataId, &victimListHeadId, keptFromEvictions);
                             keptFromEvictions.push_back(victimSegmentId);
-                            evictCycle = respCycle + 2*accLat;
+                            evictCycle = respCycle + accLat;
                             uint64_t evBeginCycle = evictCycle;
                             TimingRecord writebackRecord;
                             lastEvDoneCycle = evBeginCycle;
@@ -667,6 +669,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, true);
                         // info(""postinsert %i", tagId);
                         dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data);
+                        hashArray->postinsert(hash, &req, victimDataId, keptFromEvictions[0], hashId, true);
                         respCycle += accLat;
 
                         uint64_t getDoneCycle = respCycle;

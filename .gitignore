@@ -1,3 +1,7 @@
 .vscode
 zsim/build/*
 zsim/.sconsign.dblite
+results/*
+workspace/heartbeat
+workspace/out.cfg
+workspace/output.txt
