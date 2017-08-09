@@ -353,7 +353,8 @@ class MESICC : public CC {
             //upgrade without any interaction with the parent... the child had the permissions!)
             // info("%i, %s, %i", lineId, AccessTypeName(req.type), bcc->isValid(lineId));
             if (lineId == -1 || (((req.type == PUTS) || (req.type == PUTX)) && !bcc->isValid(lineId))) { //can only be a non-inclusive wback
-                assert(nonInclusiveHack);
+                assert_msg(nonInclusiveHack, "%lu", req.lineAddr << 6);
+                // assert(nonInclusiveHack);
                 assert((req.type == PUTS) || (req.type == PUTX));
                 respCycle = bcc->processNonInclusiveWriteback(req.lineAddr, req.type, startCycle, req.state, req.srcId, req.flags);
             } else {

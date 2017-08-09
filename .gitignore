@@ -2,6 +2,9 @@
 zsim/build/*
 zsim/.sconsign.dblite
 results/*
+bench/*
 workspace/heartbeat
 workspace/out.cfg
 workspace/output.txt
+workspace/*.h5
+workspace/*.out

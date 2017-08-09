@@ -313,6 +313,7 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
 
     // info("Valid Tags: %u", tagArray->getValidLines());
     // info("Valid Lines: %u", tagArray->getDataValidSegments()/8);
+    assert(tagArray->getValidLines() >= tagArray->getDataValidSegments()/8);
     double sample = ((double)tagArray->getDataValidSegments()/8)/(double)tagArray->getValidLines();
     crStats->add(sample,1);
 

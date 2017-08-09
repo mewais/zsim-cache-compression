@@ -69,7 +69,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
 
             if (upLat) {
                 DelayEvent* dUp = new (evRec) DelayEvent(upLat);
-                // info("uCREATE: %p at %u", dUp, __LINE__);
+                // // info("uCREATE: %p at %u", dUp, __LINE__);
                 dUp->setMinStartCycle(startCycle);
                 startEv->addChild(dUp, evRec)->addChild(r->startEvent, evRec);
             } else {
@@ -78,7 +78,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
 
             if (downLat) {
                 DelayEvent* dDown = new (evRec) DelayEvent(downLat);
-                // info("uCREATE: %p at %u", dDown, __LINE__);
+                // // info("uCREATE: %p at %u", dDown, __LINE__);
                 dDown->setMinStartCycle(r->respCycle);
                 r->endEvent->addChild(dDown, evRec)->addChild(endEv, evRec);
             } else {
@@ -89,7 +89,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                 startEv->addChild(endEv, evRec);
             } else {
                 DelayEvent* dEv = new (evRec) DelayEvent(endCycle - startCycle);
-                // info("uCREATE: %p at %u", dEv, __LINE__);
+                // // info("uCREATE: %p at %u", dEv, __LINE__);
                 dEv->setMinStartCycle(startCycle);
                 startEv->addChild(dEv, evRec)->addChild(endEv, evRec);
             }
@@ -130,7 +130,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
             // Need to evict the tag.
             tagEvDoneCycle = cc->processEviction(req, wbLineAddr, victimTagId, evictCycle);
             // // info("\t\t\tEviction finished at %lu", tagEvDoneCycle);
-            int32_t newLLHead;
+            int32_t newLLHead = -1;
             bool approximateVictim;
             bool evictDataLine = tagArray->evictAssociatedData(victimTagId, &newLLHead, &approximateVictim);
             int32_t victimDataId = tagArray->readDataId(victimTagId);
@@ -143,6 +143,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                 uint32_t victimCounter = dataArray->readCounter(victimDataId);
                 dataArray->changeInPlace(newLLHead, &req, victimCounter-1, victimDataId, approximateVictim, NULL, false);
             }
+            tagArray->postinsert(0, &req, victimTagId, -1, -1, false, false);
             if (evRec->hasRecord()) {
                 // info("\t\tEvicting tagId: %i", victimTagId);
                 Evictions++;
@@ -200,11 +201,12 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                     }
 
                 } else if (dataId >= 0 && dataArray->isSame(dataId, data)) {
-                    // info("Data is also similar.");
+                    // info("Data is also similar to %i.", dataId);
                     int32_t oldListHead = dataArray->readListHead(dataId);
+                    // info("With a list head at %i", oldListHead);
                     uint32_t dataCounter = dataArray->readCounter(dataId);
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, dataId, oldListHead, true, updateReplacement);
-                    // info("postinsert %i", victimTagId);
+                    // info("postinsert %i with oldListHead %i", victimTagId, oldListHead);
                     dataArray->postinsert(victimTagId, &req, dataCounter+1, dataId, true, NULL, updateReplacement);
                     hashArray->postinsert(hash, &req, victimDataId, hashId, true);
 
@@ -233,19 +235,24 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                     // info("Data is different, Collision.");
                     // Select data to evict
                     evictCycle = respCycle + 2*accLat;
-                    int32_t victimListHeadId;
+                    int32_t victimListHeadId, newVictimListHeadId;
                     int32_t victimDataId = dataArray->preinsert(&victimListHeadId);
                     uint64_t evBeginCycle = evictCycle;
                     TimingRecord writebackRecord;
                     uint64_t lastEvDoneCycle = tagEvDoneCycle;
+                    uint64_t evDoneCycle = evBeginCycle;
 
                     while (victimListHeadId != -1) {
-                        Address wbLineAddr = tagArray->readAddress(victimListHeadId);
-                        // info("\t\tEvicting tagId: %i, %lu", victimListHeadId, wbLineAddr);
-                        uint64_t evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
-                        // // info("\t\t\tEviction finished at %lu", evDoneCycle);
-                        tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
-                        victimListHeadId = tagArray->readNextLL(victimListHeadId);
+                        if (victimListHeadId != victimTagId) {
+                            Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                            // info("\t\tEvicting tagId: %i, %lu", victimListHeadId, wbLineAddr);
+                            evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
+                            // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                            newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
+                            tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
+                        } else {
+                            newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
+                        }
                         if (evRec->hasRecord()) {
                             Evictions++;
                             writebackRecord.clear();
@@ -256,6 +263,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             lastEvDoneCycle = evDoneCycle;
                             evBeginCycle += accLat;
                         }
+                        victimListHeadId = newVictimListHeadId;
                     }
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, victimDataId, -1, true, updateReplacement);
                     // info("postinsert %i", victimTagId);
@@ -295,20 +303,25 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                 // info("Hash is different, nothing similar.");
                 // Select data to evict
                 evictCycle = respCycle + accLat;
-                int32_t victimListHeadId;
+                int32_t victimListHeadId, newVictimListHeadId;
                 int32_t victimDataId = dataArray->preinsert(&victimListHeadId);
                 int32_t victimHashId = hashArray->preinsert(hash, &req);
                 uint64_t evBeginCycle = evictCycle;
                 TimingRecord writebackRecord;
                 uint64_t lastEvDoneCycle = tagEvDoneCycle;
+                uint64_t evDoneCycle = evBeginCycle;
 
                 while (victimListHeadId != -1) {
-                    Address wbLineAddr = tagArray->readAddress(victimListHeadId);
-                    // info("\t\tEvicting tagId: %i", victimListHeadId);
-                    uint64_t evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
-                    // // info("\t\t\tEviction finished at %lu", evDoneCycle);
-                    tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
-                    victimListHeadId = tagArray->readNextLL(victimListHeadId);
+                    if (victimListHeadId != victimTagId) {
+                        Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                        // info("\t\tEvicting tagId: %i", victimListHeadId);
+                        evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
+                        // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                        newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
+                        tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
+                    } else {
+                        newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
+                    }
                     if (evRec->hasRecord()) {
                         Evictions++;
                         writebackRecord.clear();
@@ -319,6 +332,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         lastEvDoneCycle = evDoneCycle;
                         evBeginCycle += accLat;
                     }
+                    victimListHeadId = newVictimListHeadId;
                 }
                 tagArray->postinsert(req.lineAddr, &req, victimTagId, victimDataId, -1, true, updateReplacement);
                 // info("postinsert %i", victimTagId);
@@ -368,13 +382,26 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                 // info("PUTX Hit Req");
                 if (hashId != -1) {
                     // info("Found a matching hash, proceeding to match the full line.");
-                    int32_t dataId = hashArray->readDataPointer(hashId);
-                    if(dataId >= 0 && dataArray->readListHead(dataId) == -1) {
+                    int32_t targetDataId = hashArray->readDataPointer(hashId);
+                    if(targetDataId >= 0 && dataArray->readListHead(targetDataId) == -1) {
+                        bool approximateVictim;
+                        int32_t newLLHead;
+                        bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead, &approximateVictim);
+                        if (evictDataLine) {
+                            // info("\t\tAlong with dataId: %i", dataId);
+                            // Clear (Evict, Tags already evicted) data line
+                            dataArray->postinsert(-1, &req, 0, dataId, false, NULL, false);
+                        } else if (newLLHead != -1) {
+                            // Change Tag
+                            uint32_t victimCounter = dataArray->readCounter(dataId);
+                            dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
+                        }
+                        respCycle += accLat;
                         // info("Data line was evicted before. Taking over.");
-                        tagArray->postinsert(req.lineAddr, &req, tagId, dataId, -1, true, true);
+                        tagArray->postinsert(req.lineAddr, &req, tagId, targetDataId, -1, true, true);
                         // info("postinsert %i", tagId);
-                        dataArray->postinsert(tagId, &req, 1, dataId, true, data, true);
-                        hashArray->postinsert(hash, &req, dataId, hashId, true);
+                        dataArray->postinsert(tagId, &req, 1, targetDataId, true, data, true);
+                        hashArray->postinsert(hash, &req, targetDataId, hashId, true);
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -401,15 +428,28 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         }
                         he->addChild(hwe, evRec);
                         tr.startEvent = tr.endEvent = he;
-                    } else if (dataId >= 0 && dataArray->isSame(dataId, data)) {
-                        // info("Data is also similar.");
-                        respCycle += accLat;
-                        int32_t oldListHead = dataArray->readListHead(dataId);
-                        uint32_t dataCounter = dataArray->readCounter(dataId);
-                        tagArray->postinsert(req.lineAddr, &req, tagId, dataId, oldListHead, true, updateReplacement);
-                        // info("postinsert %i", tagId);
-                        dataArray->postinsert(tagId, &req, dataCounter+1, dataId, true, NULL, updateReplacement);
-                        hashArray->postinsert(hash, &req, dataId, hashId, true);
+                    } else if (targetDataId >= 0 && dataArray->isSame(targetDataId, data)) {
+                        // info("Data is also similar to %i.", targetDataId);
+                        bool approximateVictim;
+                        int32_t newLLHead;
+                        bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead, &approximateVictim);
+                        if (evictDataLine) {
+                            // info("\t\tAlong with dataId: %i", dataId);
+                            // Clear (Evict, Tags already evicted) data line
+                            dataArray->postinsert(-1, &req, 0, dataId, false, NULL, false);
+                        } else if (newLLHead != -1) {
+                            // Change Tag
+                            uint32_t victimCounter = dataArray->readCounter(dataId);
+                            dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
+                        }
+                        respCycle += 2*accLat;
+                        int32_t oldListHead = dataArray->readListHead(targetDataId);
+                        // info("With a list head at %i", oldListHead);
+                        uint32_t dataCounter = dataArray->readCounter(targetDataId);
+                        tagArray->postinsert(req.lineAddr, &req, tagId, targetDataId, oldListHead, true, updateReplacement);
+                        // info("postinsert %i with oldListHead %i", tagId, oldListHead);
+                        dataArray->postinsert(tagId, &req, dataCounter+1, targetDataId, true, NULL, updateReplacement);
+                        hashArray->postinsert(hash, &req, targetDataId, hashId, true);
 
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
@@ -438,7 +478,6 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         he->addChild(hwe, evRec);
                         tr.startEvent = tr.endEvent = he;
                     } else {
-                        int32_t dataId = tagArray->readDataId(tagId);
                         if (dataArray->readCounter(dataId) == 1) {
                             // Data only exists once, just update.
                             // info("PUTX only once.");
@@ -458,31 +497,39 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             // info("PUTX more than once");
                             bool approximateVictim;
                             int32_t newLLHead;
-                            tagArray->evictAssociatedData(tagId, &newLLHead, &approximateVictim);
-                            if (newLLHead != -1) {
+                            bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead, &approximateVictim);
+                            if (evictDataLine) {
+                                // info("\t\tAlong with dataId: %i", dataId);
+                                // Clear (Evict, Tags already evicted) data line
+                                dataArray->postinsert(-1, &req, 0, dataId, false, NULL, false);
+                            } else if (newLLHead != -1) {
                                 // Change Tag
                                 uint32_t victimCounter = dataArray->readCounter(dataId);
-                                dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, false, NULL, false);
+                                dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
                             }
-
                             
                             evictCycle = respCycle + accLat;
                             respCycle += 2*accLat;
-                            int32_t victimListHeadId;
+                            int32_t victimListHeadId, newVictimListHeadId;
                             int32_t victimDataId = dataArray->preinsert(&victimListHeadId);
                             while (victimDataId == dataId)
                                 victimDataId = dataArray->preinsert(&victimListHeadId);
                             uint64_t evBeginCycle = evictCycle;
+                            uint64_t evDoneCycle = evBeginCycle;
                             TimingRecord writebackRecord;
                             uint64_t lastEvDoneCycle = tagEvDoneCycle;
 
                             while (victimListHeadId != -1) {
-                                Address wbLineAddr = tagArray->readAddress(victimListHeadId);
-                                // info("\t\tEvicting tagId: %i", victimListHeadId);
-                                uint64_t evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
-                                // // info("\t\t\tEviction finished at %lu", evDoneCycle);
-                                tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
-                                victimListHeadId = tagArray->readNextLL(victimListHeadId);
+                                if (victimListHeadId != tagId) {
+                                    Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                                    // info("\t\tEvicting tagId: %i", victimListHeadId);
+                                    evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
+                                    // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                                    newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
+                                    tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
+                                } else {
+                                    newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
+                                }
                                 if (evRec->hasRecord()) {
                                     Evictions++;
                                     writebackRecord.clear();
@@ -493,6 +540,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                                     lastEvDoneCycle = evDoneCycle;
                                     evBeginCycle += accLat;
                                 }
+                                victimListHeadId = newVictimListHeadId;
                             }
                             tagArray->changeInPlace(req.lineAddr, &req, tagId, victimDataId, -1, true, false);
                             // info("changeInPlace %i", tagId);
@@ -533,6 +581,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         // Data only exists once, just update.
                         // info("PUTX only once.");
                         dataArray->writeData(dataId, data, &req, true);
+                        hashId = hashArray->preinsert(hash, &req);
                         hashArray->postinsert(hash, &req, dataId, hashId, true);
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
@@ -548,30 +597,39 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         // info("PUTX more than once");
                         bool approximateVictim;
                         int32_t newLLHead;
-                        tagArray->evictAssociatedData(tagId, &newLLHead, &approximateVictim);
-                        if (newLLHead != -1) {
+                        bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead, &approximateVictim);
+                        if (evictDataLine) {
+                            // info("\t\tAlong with dataId: %i", dataId);
+                            // Clear (Evict, Tags already evicted) data line
+                            dataArray->postinsert(-1, &req, 0, dataId, false, NULL, false);
+                        } else if (newLLHead != -1) {
                             // Change Tag
                             uint32_t victimCounter = dataArray->readCounter(dataId);
-                            dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, false, NULL, false);
+                            dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
                         }
                         
                         evictCycle = respCycle + accLat;
                         respCycle += 2*accLat;
-                        int32_t victimListHeadId;
+                        int32_t victimListHeadId, newVictimListHeadId;
                         int32_t victimDataId = dataArray->preinsert(&victimListHeadId);
                         while (victimDataId == dataId)
                             victimDataId = dataArray->preinsert(&victimListHeadId);
                         uint64_t evBeginCycle = evictCycle;
+                        uint64_t evDoneCycle = evBeginCycle;
                         TimingRecord writebackRecord;
                         uint64_t lastEvDoneCycle = tagEvDoneCycle;
 
                         while (victimListHeadId != -1) {
-                            Address wbLineAddr = tagArray->readAddress(victimListHeadId);
-                            // info("\t\tEvicting tagId: %i", victimListHeadId);
-                            uint64_t evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
-                            // // info("\t\t\tEviction finished at %lu", evDoneCycle);
-                            tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
-                            victimListHeadId = tagArray->readNextLL(victimListHeadId);
+                            if (victimListHeadId != tagId) {
+                                Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                                // info("\t\tEvicting tagId: %i", victimListHeadId);
+                                evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
+                                // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                                newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
+                                tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
+                            } else {
+                                newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
+                            }
                             if (evRec->hasRecord()) {
                                 Evictions++;
                                 writebackRecord.clear();
@@ -582,10 +640,12 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                                 lastEvDoneCycle = evDoneCycle;
                                 evBeginCycle += accLat;
                             }
+                            victimListHeadId = newVictimListHeadId;
                         }
                         tagArray->changeInPlace(req.lineAddr, &req, tagId, victimDataId, -1, true, false);
                         // info("changeInPlace %i", tagId);
                         dataArray->postinsert(tagId, &req, 1, victimDataId, true, data, updateReplacement);
+                        hashId = hashArray->preinsert(hash, &req);
                         hashArray->postinsert(hash, &req, victimDataId, hashId, true);
                         respCycle += accLat;
 
@@ -643,6 +703,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
 
     // info("Valid Tags: %u", tagArray->getValidLines());
     // info("Valid Lines: %u", dataArray->getValidLines());
+    assert(tagArray->getValidLines() >= dataArray->getValidLines());
     double sample = (double)dataArray->getValidLines()/(double)tagArray->getValidLines();
     crStats->add(sample,1);
 

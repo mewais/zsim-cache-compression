@@ -814,9 +814,6 @@ bool ApproximateDedupTagArray::evictAssociatedData(int32_t lineId, int32_t* newL
     *newLLHead = -1;
     if (dataPointerArray[lineId] == -1)
         return false;
-    // if (!approximateArray[lineId])
-    //     return true;
-    // *approximate = true;
     if (prevPointerArray[lineId] != -1)
         return false;
     else
@@ -844,9 +841,14 @@ void ApproximateDedupTagArray::postinsert(Address lineAddr, const MemReq* req, i
     nextPointerArray[tagId] = listHead;
     if (listHead >= 0) {
         if(prevPointerArray[listHead] == -1) prevPointerArray[listHead] = tagId;
-        else panic("List head is not actually a list head!");
+        else panic("List head %i is not actually a list head! %i is.", listHead, prevPointerArray[listHead]);
     }
     if(updateReplacement) rp->update(tagId, req);
+    // info("Tag %i: %lu, %i, %i, %i, %s", tagId, tagArray[tagId] << lineBits, prevPointerArray[tagId], nextPointerArray[tagId], dataPointerArray[tagId], approximateArray[tagId]? "approximate":"exact");
+    // if (prevPointerArray[tagId] != -1)
+    //     info("Tag %i: %lu, %i, %i, %i, %s", prevPointerArray[tagId], tagArray[prevPointerArray[tagId]] << lineBits, prevPointerArray[prevPointerArray[tagId]], nextPointerArray[prevPointerArray[tagId]], dataPointerArray[prevPointerArray[tagId]], approximateArray[prevPointerArray[tagId]]? "approximate":"exact");
+    // if (nextPointerArray[tagId] != -1)
+    //     info("Tag %i: %lu, %i, %i, %i, %s", nextPointerArray[tagId], tagArray[nextPointerArray[tagId]] << lineBits, prevPointerArray[nextPointerArray[tagId]], nextPointerArray[nextPointerArray[tagId]], dataPointerArray[nextPointerArray[tagId]], approximateArray[nextPointerArray[tagId]]? "approximate":"exact");
 }
 
 void ApproximateDedupTagArray::changeInPlace(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t listHead, bool approximate, bool updateReplacement) {
@@ -861,9 +863,14 @@ void ApproximateDedupTagArray::changeInPlace(Address lineAddr, const MemReq* req
     nextPointerArray[tagId] = listHead;
     if (listHead >= 0) {
         if(prevPointerArray[listHead] == -1) prevPointerArray[listHead] = tagId;
-        else panic("List head is not actually a list head!");
+        else panic("List head %i is not actually a list head! %i is.", listHead, prevPointerArray[listHead]);
     }
     if(updateReplacement) rp->update(tagId, req);
+    // info("Tag %i: %lu, %i, %i, %i, %s", tagId, tagArray[tagId] << lineBits, prevPointerArray[tagId], nextPointerArray[tagId], dataPointerArray[tagId], approximateArray[tagId]? "approximate":"exact");
+    // if (prevPointerArray[tagId] != -1)
+    //     info("Tag %i: %lu, %i, %i, %i, %s", prevPointerArray[tagId], tagArray[prevPointerArray[tagId]] << lineBits, prevPointerArray[prevPointerArray[tagId]], nextPointerArray[prevPointerArray[tagId]], dataPointerArray[prevPointerArray[tagId]], approximateArray[prevPointerArray[tagId]]? "approximate":"exact");
+    // if (nextPointerArray[tagId] != -1)
+    //     info("Tag %i: %lu, %i, %i, %i, %s", nextPointerArray[tagId], tagArray[nextPointerArray[tagId]] << lineBits, prevPointerArray[nextPointerArray[tagId]], nextPointerArray[nextPointerArray[tagId]], dataPointerArray[nextPointerArray[tagId]], approximateArray[nextPointerArray[tagId]]? "approximate":"exact");
 }
 
 int32_t ApproximateDedupTagArray::readDataId(const int32_t tagId) {
@@ -876,6 +883,7 @@ Address ApproximateDedupTagArray::readAddress(int32_t tagId) {
 }
 
 int32_t ApproximateDedupTagArray::readNextLL(int32_t tagId) {
+    // info("Next LL: %i", nextPointerArray[tagId]);
     return nextPointerArray[tagId];
 }
 
@@ -951,9 +959,15 @@ void ApproximateDedupDataArray::postinsert(int32_t tagId, const MemReq* req, int
     tagPointerArray[dataId] = tagId;
     approximateArray[dataId] = approximate;
     if(updateReplacement) rp->update(dataId, req);
+    // info("Data %i: %i, %i, %s", dataId, tagCounterArray[dataId], tagPointerArray[dataId], approximateArray[dataId]? "approximate":"exact");
 }
 
 void ApproximateDedupDataArray::changeInPlace(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, bool approximate, DataLine data, bool updateReplacement) {
+    if (tagPointerArray[dataId] == -1 && tagId != -1) {
+        validLines++;
+    } else if (tagPointerArray[dataId] != -1 && tagId == -1) {
+        validLines--;
+    }
     if (data)
         PIN_SafeCopy(dataArray[dataId], data, zinfo->lineSize);
     // rp->replaced(dataId);
@@ -961,6 +975,7 @@ void ApproximateDedupDataArray::changeInPlace(int32_t tagId, const MemReq* req, 
     tagPointerArray[dataId] = tagId;
     approximateArray[dataId] = approximate;
     if(updateReplacement) rp->update(dataId, req);
+    // info("Data %i: %i, %i, %s", dataId, tagCounterArray[dataId], tagPointerArray[dataId], approximateArray[dataId]? "approximate":"exact");
 }
 
 bool ApproximateDedupDataArray::isSame(int32_t dataId, DataLine data) {

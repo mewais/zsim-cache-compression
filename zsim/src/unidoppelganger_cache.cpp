@@ -203,7 +203,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                     // allocate new data/mtag and evict another if necessary,
                     // evict the tags associated with it too.
                     evictCycle = respCycle + accLat;
-                    int32_t victimListHeadId;
+                    int32_t victimListHeadId, newVictimListHeadId;
                     int32_t victimDataId = dataArray->preinsert(map, &req, &victimListHeadId);
                     uint64_t evBeginCycle = evictCycle;
                     TimingRecord writebackRecord;
@@ -214,8 +214,8 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                         // info("\t\tEvicting tagId: %i", victimListHeadId);
                         uint64_t evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
                         // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                        newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                         tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
-                        victimListHeadId = tagArray->readNextLL(victimListHeadId);
                         if (evRec->hasRecord()) {
                             Evictions++;
                             writebackRecord.clear();
@@ -226,6 +226,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                             lastEvDoneCycle = evDoneCycle;
                             evBeginCycle += accLat;
                         }
+                        victimListHeadId = newVictimListHeadId;
                     }
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, victimDataId, -1, true, updateReplacement);
                     dataArray->postinsert(map, &req, victimDataId, victimTagId, true, updateReplacement);
@@ -307,7 +308,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                 uint64_t lastEvDoneCycle = evictCycle;
                 if (!Free) {
                     // srand (time(NULL));
-                    int32_t victimListHeadId;
+                    int32_t victimListHeadId, newVictimListHeadId;
                     uint32_t map = rand() % (uint32_t)std::pow(2, zinfo->mapSize-1);
                     victimDataId = dataArray->preinsert(map, &req, &victimListHeadId);
                     evictCycle += accLat;
@@ -319,8 +320,8 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                         // info("\t\tEvicting tagId: %i", victimListHeadId);
                         uint64_t evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
                         // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                        newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                         tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
-                        victimListHeadId = tagArray->readNextLL(victimListHeadId);
                         if (evRec->hasRecord()) {
                             Evictions++;
                             writebackRecord.clear();
@@ -331,6 +332,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                             lastEvDoneCycle = evDoneCycle;
                             evBeginCycle += accLat;
                         }
+                        victimListHeadId = newVictimListHeadId;
                     }
                 }
                 tagArray->postinsert(req.lineAddr, &req, victimTagId, victimDataId, -1, false, updateReplacement);
@@ -430,7 +432,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                         // and is also not similar to anything we have, we
                         // need to allocate new data, and evict another if we
                         // have to.
-                        int32_t victimListHeadId;
+                        int32_t victimListHeadId, newVictimListHeadId;
                         int32_t victimDataId = dataArray->preinsert(map, &req, &victimListHeadId);
                         respCycle += accLat;
                         uint64_t wbStartCycle = respCycle;
@@ -445,9 +447,11 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                                 // info("\t\tEvicting tagId %i associated with victim dataId %i", victimListHeadId, victimDataId);
                                 evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, wbStartCycle);
                                 // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                                newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                 tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
+                            } else {
+                                newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                             }
-                            victimListHeadId = tagArray->readNextLL(victimListHeadId);
                             if (evRec->hasRecord()) {
                                 Evictions++;
                                 writebackRecord.clear();
@@ -459,6 +463,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                                 wbEndCycles.push_back(evDoneCycle);
                                 lastEvDoneCycle = evDoneCycle;
                             }
+                            victimListHeadId = newVictimListHeadId;
                         }
 
                         int32_t newLLHead;
@@ -532,6 +537,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
 
     // // info("Valid Tags: %u", tagArray->getValidLines());
     // // info("Valid Lines: %u", dataArray->getValidLines());
+    assert(tagArray->getValidLines() >= dataArray->getValidLines());
     double sample = (double)dataArray->getValidLines()/(double)tagArray->getValidLines();
     crStats->add(sample,1);
 
