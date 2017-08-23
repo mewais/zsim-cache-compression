@@ -138,6 +138,7 @@ void uniDoppelgangerTagArray::postinsert(Address lineAddr, const MemReq* req, in
     if (!tagArray[tagId] && lineAddr) {
         validLines++;
     } else if (tagArray[tagId] && !lineAddr) {
+        assert(validLines);
         validLines--;
     }
     rp->replaced(tagId);
@@ -480,6 +481,7 @@ void uniDoppelgangerDataArray::postinsert(int32_t map, const MemReq* req, int32_
     if (tagPointerArray[mapId] == -1 && tagId != -1) {
         validLines++;
     } else if (tagPointerArray[mapId] != -1 && tagId == -1) {
+        assert(validLines);
         validLines--;
     }
     rp->replaced(mapId);
@@ -586,6 +588,8 @@ void ApproximateBDITagArray::postinsert(Address lineAddr, const MemReq* req, int
     } else if (tagArray[tagId] && !lineAddr) {
         validLines--;
         dataValidSegments-=BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize)/8;
+        assert(validLines);
+        assert(dataValidSegments);
     } else {
         dataValidSegments-=BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize)/8;
         dataValidSegments+=BDICompressionToSize(compression, zinfo->lineSize)/8;
@@ -627,123 +631,382 @@ void ApproximateBDITagArray::print() {
     }
 }
 
-// TODO: This was copied varbatim from https://github.com/CMU-SAFARI/BDICompression/blob/master/compression.c
-// optimize for our purposes later.
-uint64_t ApproximateBDIDataArray::my_llabs(int64_t x) {
-    uint64_t t = x >> 63;
-    return (x ^ t) - t;
+// // TODO: This was copied varbatim from https://github.com/CMU-SAFARI/BDICompression/blob/master/compression.c
+// // optimize for our purposes later.
+// uint64_t ApproximateBDIDataArray::my_llabs(int64_t x) {
+//     uint64_t t = x >> 63;
+//     return (x ^ t) - t;
+// }
+
+// // TODO: This was copied varbatim from https://github.com/CMU-SAFARI/BDICompression/blob/master/compression.c
+// // and/or Amin. optimize for our purposes later.
+// uint8_t ApproximateBDIDataArray::multiBaseCompression(uint64_t * values, uint8_t size, uint8_t blimit, uint8_t bsize) {
+//     uint64_t limit = 0;
+//     uint8_t numBase = 2;
+
+//     //define the appropriate size for the mask
+//     switch(blimit){
+//         case 1:
+//             limit = 0xFF;
+//             break;
+//         case 2:
+//             limit = 0xFFFF;
+//             break;
+//         case 4:
+//             limit = 0xFFFFFFFF;
+//             break;
+//         default:
+//             panic("Wrong BDI Size");
+//             return 0;
+//     }
+
+//     uint64_t mnumBase [64];
+//     uint8_t baseCount = 1;
+//     mnumBase[0] = 0;// values[0];
+
+//     uint8_t i,j;
+//     for (i = 0; i < size; i++) {
+//         bool isFound=0;
+//         for(j = 0; j <  baseCount; j++) {
+//             if(my_llabs((int64_t)(mnumBase[j] -  values[i])) <= limit) {
+//                 isFound = 1;
+//                 break;
+//             }
+//         }
+//         if(isFound == 0)
+//             mnumBase[baseCount++] = values[i];
+//         if(baseCount >= numBase)
+//             break;
+//     }
+//     uint8_t compCount = 0;
+//     for (i = 0; i < size; i++) {
+//         for(j = 0; j <  baseCount; j++) {
+//             if(my_llabs((int64_t)(mnumBase[j] -  values[i])) <= limit) {
+//                 compCount++;
+//                 break;
+//             }
+//         }
+//     }
+
+//     //return compressed size
+//     uint8_t mCompSize = blimit * compCount + bsize * (numBase-1) + (size - compCount) * bsize; // implicit zero base gozashtim
+
+//     uint8_t retVal = mCompSize;
+//     if(compCount < size) {
+//         retVal =  size * bsize;
+//     }
+
+//     return retVal;
+// }
+
+static unsigned long long my_llabs ( long long x )
+{
+   unsigned long long t = x >> 63;
+   return (x ^ t) - t;
 }
 
-// TODO: This was copied varbatim from https://github.com/CMU-SAFARI/BDICompression/blob/master/compression.c
-// and/or Amin. optimize for our purposes later.
-uint8_t ApproximateBDIDataArray::multiBaseCompression(uint64_t * values, uint8_t size, uint8_t blimit, uint8_t bsize) {
-    uint64_t limit = 0;
-    uint8_t numBase = 2;
+long long unsigned * convertBuffer2Array (char * buffer, unsigned size, unsigned step)
+{
+      long long unsigned * values = (long long unsigned *) malloc(sizeof(long long unsigned) * size/step);
+//      std::cout << std::dec << "ConvertBuffer = " << size/step << std::endl;
+     //init
+     unsigned int i,j; 
+     for (i = 0; i < size / step; i++) {
+          values[i] = 0;    // Initialize all elements to zero.
+      }
+      //SIM_printf("Element Size = %d \n", step);
+      for (i = 0; i < size; i += step ){
+          for (j = 0; j < step; j++){
+              //SIM_printf("Buffer = %02x \n", (unsigned char) buffer[i + j]);
+              values[i / step] += (long long unsigned)((unsigned char)buffer[i + j]) << (8*j);
+              //SIM_printf("step %d value = ", j);
+              //printLLwithSize(values[i / step], step);  
+          }
+          //std::cout << "Current value = " << values[i / step] << std::endl;
+          //printLLwithSize(values[i / step], step);
+          //SIM_printf("\n");
+      }
+      //std::cout << "End ConvertBuffer = " << size/step << std::endl;
+      return values;
+}
 
-    //define the appropriate size for the mask
-    switch(blimit){
-        case 1:
-            limit = 0xFF;
-            break;
-        case 2:
-            limit = 0xFFFF;
-            break;
-        case 4:
-            limit = 0xFFFFFFFF;
-            break;
-        default:
-            panic("Wrong BDI Size");
-            return 0;
-    }
+///
+/// Check if the cache line consists of only zero values
+///
+int isZeroPackable ( long long unsigned * values, unsigned size){
+  int nonZero = 0;
+  unsigned int i;
+  for (i = 0; i < size; i++) {
+      if( values[i] != 0){
+          nonZero = 1;
+          break;
+      }
+  }
+  return !nonZero;
+}
 
-    uint64_t mnumBase [64];
-    uint8_t baseCount = 1;
-    mnumBase[0] = 0;// values[0];
+///
+/// Check if the cache line consists of only same values
+///
+int isSameValuePackable ( long long unsigned * values, unsigned size){
+  int notSame = 0;
+  unsigned int i;
+  for (i = 0; i < size; i++) {
+      if( values[0] != values[i]){
+          notSame = 1;
+          break;
+      }
+  }
+  return !notSame;
+}
 
-    uint8_t i,j;
-    for (i = 0; i < size; i++) {
-        bool isFound=0;
-        for(j = 0; j <  baseCount; j++) {
-            if(my_llabs((int64_t)(mnumBase[j] -  values[i])) <= limit) {
-                isFound = 1;
-                break;
-            }
-        }
-        if(isFound == 0)
-            mnumBase[baseCount++] = values[i];
-        if(baseCount >= numBase)
-            break;
-    }
-    uint8_t compCount = 0;
-    for (i = 0; i < size; i++) {
-        for(j = 0; j <  baseCount; j++) {
-            if(my_llabs((int64_t)(mnumBase[j] -  values[i])) <= limit) {
-                compCount++;
-                break;
-            }
-        }
-    }
+///
+/// Check if the cache line values can be compressed with multiple base + 1,2,or 4-byte offset 
+/// Returns size after compression 
+///
+unsigned doubleExponentCompression ( long long unsigned * values, unsigned size, unsigned blimit, unsigned bsize){
+  unsigned long long limit = 0;
+  //define the appropriate size for the mask
+  switch(blimit){
+    case 1:
+      limit = 56;
+      break;
+    case 2:
+      limit = 48;
+      break;
+    default:
+      // std::cout << "Wrong blimit value = " <<  blimit << std::endl;
+      exit(1);
+  }
+  // finding bases: # BASES
+  // find how many elements can be compressed with mbases
+  unsigned compCount = 0;
+  unsigned int i;
+  for (i = 0; i < size; i++) {
+         if( (values[0] >> limit) ==  (values[i] >> limit))  {
+             compCount++;
+         }
+  }
+  //return compressed size
+  if(compCount != size )
+     return size * bsize;
+  return size * bsize - (compCount - 1) * blimit;
+}
 
-    //return compressed size
-    uint8_t mCompSize = blimit * compCount + bsize * (numBase-1) + (size - compCount) * bsize; // implicit zero base gozashtim
 
-    uint8_t retVal = mCompSize;
-    if(compCount < size) {
-        retVal =  size * bsize;
-    }
+///
+/// Check if the cache line values can be compressed with multiple base + 1,2,or 4-byte offset 
+/// Returns size after compression 
+///
+unsigned multBaseCompression ( long long unsigned * values, unsigned size, unsigned blimit, unsigned bsize){
+  unsigned long long limit = 0;
+  unsigned BASES = 2;
+  //define the appropriate size for the mask
+  switch(blimit){
+    case 1:
+      limit = 0xFF;
+      break;
+    case 2:
+      limit = 0xFFFF;
+      break;
+    case 4:
+      limit = 0xFFFFFFFF;
+      break;
+    default:
+      //std::cout << "Wrong blimit value = " <<  blimit << std::endl;
+      exit(1);
+  }
+  // finding bases: # BASES
+  //std::vector<unsigned long long> mbases;
+  //mbases.push_back(values[0]); //add the first base
+  unsigned long long mbases [64];
+  unsigned baseCount = 1;
+  mbases[0] = 0;
+  unsigned int i,j;
+  for (i = 0; i < size; i++) {
+      for(j = 0; j <  baseCount; j++){
+         if( my_llabs((long long int)(mbases[j] -  values[i])) > limit ){
+             //mbases.push_back(values[i]); // add new base
+             mbases[baseCount++] = values[i];  
+         }
+     }
+     if(baseCount >= BASES) //we don't have more bases
+       break;
+  }
+  // find how many elements can be compressed with mbases
+  unsigned compCount = 0;
+  for (i = 0; i < size; i++) {
+      //ol covered = 0;
+      for(j = 0; j <  baseCount; j++){
+         if( my_llabs((long long int)(mbases[j] -  values[i])) <= limit ){
+             compCount++;
+             break;
+         }
+     }
+  }
+  //return compressed size
+  unsigned mCompSize = blimit * compCount + bsize * BASES + (size - compCount) * bsize;
+  if(compCount < size)
+     return size * bsize;
+  //VG_(printf)("%d-bases bsize = %d osize = %d CompCount = %d CompSize = %d\n", BASES, bsize, blimit, compCount, mCompSize);
+  return mCompSize;
+}
 
-    return retVal;
+unsigned BDICompress (char * buffer, unsigned _blockSize)
+{
+  //char * dst = new char [_blockSize];
+//  print_value(buffer, _blockSize);
+ 
+  long long unsigned * values = convertBuffer2Array( buffer, _blockSize, 8);
+  unsigned bestCSize = _blockSize;
+  unsigned currCSize = _blockSize;
+  if( isZeroPackable( values, _blockSize / 8))
+      bestCSize = 1;
+  if( isSameValuePackable( values, _blockSize / 8))
+      currCSize = 8;
+  bestCSize = bestCSize > currCSize ? currCSize: bestCSize;
+  currCSize = multBaseCompression( values, _blockSize / 8, 1, 8);
+  bestCSize = bestCSize > currCSize ? currCSize: bestCSize;
+  currCSize = multBaseCompression( values, _blockSize / 8, 2, 8);
+  bestCSize = bestCSize > currCSize ? currCSize: bestCSize;
+  currCSize =  multBaseCompression( values, _blockSize / 8, 4, 8);
+  bestCSize = bestCSize > currCSize ? currCSize: bestCSize;
+  free(values);
+  values = convertBuffer2Array( buffer, _blockSize, 4);
+  if( isSameValuePackable( values, _blockSize / 4))
+      currCSize = 4;
+  bestCSize = bestCSize > currCSize ? currCSize: bestCSize;
+  currCSize = multBaseCompression( values, _blockSize / 4, 1, 4);
+  bestCSize = bestCSize > currCSize ? currCSize: bestCSize;
+  currCSize = multBaseCompression( values, _blockSize / 4, 2, 4);
+  bestCSize = bestCSize > currCSize ? currCSize: bestCSize;
+  free(values);
+  values = convertBuffer2Array( buffer, _blockSize, 2);
+  currCSize = multBaseCompression( values, _blockSize / 2, 1, 2);
+  bestCSize = bestCSize > currCSize ? currCSize: bestCSize;
+  free(values);
+
+  //exponent base compression
+  /*values = convertBuffer2Array( buffer, _blockSize, 8);
+  currCSize = doubleExponentCompression( values, _blockSize / 8, 2, 8);
+  bestCSize = bestCSize > currCSize ? currCSize: bestCSize;
+  currCSize = doubleExponentCompression( values, _blockSize / 8, 1, 8);
+  bestCSize = bestCSize > currCSize ? currCSize: bestCSize;
+  VG_(free)(values);*/
+ 
+  //delete [] buffer;
+  buffer = NULL;
+  values = NULL;
+  //SIM_printf(" BestCSize = %d \n", bestCSize);
+  return bestCSize;
+
 }
 
 BDICompressionEncoding ApproximateBDIDataArray::compress(const DataLine data, uint16_t* size) {
-    bool Zero = true;
-    bool Repetitive = true;
-    for (uint16_t i = 0; i < zinfo->lineSize/8; i++)
-    {
-        if (Zero && ((uint64_t*)data)[i] != 0)
-            Zero = false;
-        if (Repetitive && ((uint64_t*)data)[i] != ((uint64_t*)data)[0])
-            Repetitive = false;
-        if (!(Zero || Repetitive))
-            break;
-    }
-    if (Zero){                                                                                      // Size 1
+    // info("\tApproximate Data: %lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu", ((uint64_t*)data)[0], ((uint64_t*)data)[1], ((uint64_t*)data)[2], ((uint64_t*)data)[3], ((uint64_t*)data)[4], ((uint64_t*)data)[5], ((uint64_t*)data)[6], ((uint64_t*)data)[7]);
+    *size = BDICompress((char*)data, 64);
+    if (*size == 1){                                                                               // Size 1
         *size = 8;
+        // info("Compression: ZERO, %i segments", 1);
         return ZERO;
     }
-    if (Repetitive){                                                                                // Size 8
+    if (*size == 8){                                                                               // Size 8
         *size = 8;
+        // info("Compression: REPETITIVE, %i segments", 1);
         return REPETITIVE;
     }
-    if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/8, 1, 8) != zinfo->lineSize){        // Size 16
+    if (*size == 16){                                                                              // Size 16
         *size = 16;
+        // info("Compression: BASE8DELTA1, %i segments", 2);
         return BASE8DELTA1;
     }
-    if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/4, 1, 4) != zinfo->lineSize){        // Size 20
+    if (*size == 20){        // Size 20
         *size = 24;
+        // info("Compression: BASE4DELTA1, %i segments", 3);
         return BASE4DELTA1;
     }
-    if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/8, 2, 8) != zinfo->lineSize){        // Size 24
+    if (*size == 24){        // Size 24
         *size = 24;
+        // info("Compression: BASE8DELTA2, %i segments", 3);
         return BASE8DELTA2;
     }
-    if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/2, 1, 2) != zinfo->lineSize){        // Size 34
+    if (*size == 34){        // Size 34
         *size = 40;
+        // info("Compression: BASE2DELTA1, %i segments", 5);
         return BASE2DELTA1;
     }
-    if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/4, 2, 4) != zinfo->lineSize){        // Size 36
+    if (*size == 36){        // Size 36
         *size = 40;
+        // info("Compression: BASE4DELTA2, %i segments", 5);
         return BASE4DELTA2;
     }
-    if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/8, 4, 8) != zinfo->lineSize){        // Size 40
+    if (*size == 40){        // Size 40
         *size = 40;
+        // info("Compression: BASE8DELTA4, %i segments", 5);
         return BASE8DELTA4;
     }
     *size = zinfo->lineSize;
+    // info("Compression: None, %i segments", 8);
     return NONE;
+    
+    // bool Zero = true;
+    // bool Repetitive = true;
+    // for (uint16_t i = 0; i < zinfo->lineSize/8; i++)
+    // {
+    //     if (Zero && ((uint64_t*)data)[i] != 0)
+    //         Zero = false;
+    //     if (Repetitive && ((uint64_t*)data)[i] != ((uint64_t*)data)[0])
+    //         Repetitive = false;
+    //     if (!(Zero || Repetitive))
+    //         break;
+    // }
+    // if (Zero){                                                                                      // Size 1
+    //     *size = 8;
+    //     info("Compression: ZERO, %i segments", 1);
+    //     return ZERO;
+    // }
+    // if (Repetitive){                                                                                // Size 8
+    //     *size = 8;
+    //     info("Compression: REPETITIVE, %i segments", 1);
+    //     return REPETITIVE;
+    // }
+    // if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/8, 1, 8) != zinfo->lineSize){        // Size 16
+    //     *size = 16;
+    //     info("Compression: BASE8DELTA1, %i segments", 2);
+    //     return BASE8DELTA1;
+    // }
+    // if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/4, 1, 4) != zinfo->lineSize){        // Size 20
+    //     *size = 24;
+    //     info("Compression: BASE4DELTA1, %i segments", 3);
+    //     return BASE4DELTA1;
+    // }
+    // if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/8, 2, 8) != zinfo->lineSize){        // Size 24
+    //     *size = 24;
+    //     info("Compression: BASE8DELTA2, %i segments", 3);
+    //     return BASE8DELTA2;
+    // }
+    // if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/2, 1, 2) != zinfo->lineSize){        // Size 34
+    //     *size = 40;
+    //     info("Compression: BASE2DELTA1, %i segments", 5);
+    //     return BASE2DELTA1;
+    // }
+    // if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/4, 2, 4) != zinfo->lineSize){        // Size 36
+    //     *size = 40;
+    //     info("Compression: BASE4DELTA2, %i segments", 5);
+    //     return BASE4DELTA2;
+    // }
+    // if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/8, 4, 8) != zinfo->lineSize){        // Size 40
+    //     *size = 40;
+    //     info("Compression: BASE8DELTA4, %i segments", 5);
+    //     return BASE8DELTA4;
+    // }
+    // *size = zinfo->lineSize;
+    // info("Compression: None, %i segments", 8);
+    // return NONE;
 }
 
 void ApproximateBDIDataArray::approximate(const DataLine data, DataType type) {
+    // info("\tExact Data: %lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu", ((uint64_t*)data)[0], ((uint64_t*)data)[1], ((uint64_t*)data)[2], ((uint64_t*)data)[3], ((uint64_t*)data)[4], ((uint64_t*)data)[5], ((uint64_t*)data)[6], ((uint64_t*)data)[7]);
     if (type == ZSIM_FLOAT) {
         for (uint16_t i = 0; i < zinfo->lineSize/4; i++)
         {
@@ -827,6 +1090,7 @@ void ApproximateDedupTagArray::postinsert(Address lineAddr, const MemReq* req, i
     if (!tagArray[tagId] && lineAddr) {
         validLines++;
     } else if (tagArray[tagId] && !lineAddr) {
+        assert(validLines);
         validLines--;
     }
     rp->replaced(tagId);
@@ -951,6 +1215,7 @@ void ApproximateDedupDataArray::postinsert(int32_t tagId, const MemReq* req, int
         validLines++;
     } else if (tagPointerArray[dataId] != -1 && tagId == -1) {
         validLines--;
+        assert(validLines);
     }
     if (data)
         PIN_SafeCopy(dataArray[dataId], data, zinfo->lineSize);
@@ -967,6 +1232,7 @@ void ApproximateDedupDataArray::changeInPlace(int32_t tagId, const MemReq* req, 
         validLines++;
     } else if (tagPointerArray[dataId] != -1 && tagId == -1) {
         validLines--;
+        assert(validLines);
     }
     if (data)
         PIN_SafeCopy(dataArray[dataId], data, zinfo->lineSize);
@@ -1216,14 +1482,25 @@ bool ApproximateDedupBDITagArray::evictAssociatedData(int32_t lineId, int32_t* n
 }
 
 void ApproximateDedupBDITagArray::postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t segmentId, BDICompressionEncoding encoding, int32_t listHead, bool updateReplacement) {
+    // info("Tag was %i: %lu, %i, %i, %i, %i, %i", tagId, tagArray[tagId] << lineBits, prevPointerArray[tagId], nextPointerArray[tagId], dataPointerArray[tagId], segmentPointerArray[tagId], BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize));
+    // if (prevPointerArray[tagId] != -1)
+    //     info("Tag was %i: %lu, %i, %i, %i, %i, %i", prevPointerArray[tagId], tagArray[prevPointerArray[tagId]] << lineBits, prevPointerArray[prevPointerArray[tagId]], nextPointerArray[prevPointerArray[tagId]], dataPointerArray[prevPointerArray[tagId]], segmentPointerArray[prevPointerArray[tagId]], BDICompressionToSize(compressionEncodingArray[prevPointerArray[tagId]], zinfo->lineSize));
+    // if (nextPointerArray[tagId] != -1)
+    //     info("Tag was %i: %lu, %i, %i, %i, %i, %i", nextPointerArray[tagId], tagArray[nextPointerArray[tagId]] << lineBits, prevPointerArray[nextPointerArray[tagId]], nextPointerArray[nextPointerArray[tagId]], dataPointerArray[nextPointerArray[tagId]], segmentPointerArray[nextPointerArray[tagId]], BDICompressionToSize(compressionEncodingArray[nextPointerArray[tagId]], zinfo->lineSize));
     if (!tagArray[tagId] && lineAddr) {
+        if (listHead == -1) {
+            dataValidSegments+=BDICompressionToSize(encoding, zinfo->lineSize)/8;
+            // info("UP");
+        }
         validLines++;
-        dataValidSegments+=BDICompressionToSize(encoding, zinfo->lineSize)/8;
     } else if (tagArray[tagId] && !lineAddr) {
         validLines--;
-        dataValidSegments-=BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize)/8;
-    } else {
-        dataValidSegments-=BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize)/8;
+        if (nextPointerArray[tagId] == -1 && prevPointerArray[tagId] == -1) {
+            dataValidSegments-=BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize)/8;
+            assert(dataValidSegments);
+            // info("DOWN");
+        }
+    } else if (tagArray[tagId] && (nextPointerArray[tagId] > -1 || prevPointerArray[tagId] > -1) && lineAddr && listHead == -1) {
         dataValidSegments+=BDICompressionToSize(encoding, zinfo->lineSize)/8;
     }
     rp->replaced(tagId);
@@ -1242,9 +1519,29 @@ void ApproximateDedupBDITagArray::postinsert(Address lineAddr, const MemReq* req
         else panic("List head is not actually a list head!");
     }
     if(updateReplacement) rp->update(tagId, req);
+    // info("Tag is %i: %lu, %i, %i, %i, %i, %i", tagId, tagArray[tagId] << lineBits, prevPointerArray[tagId], nextPointerArray[tagId], dataPointerArray[tagId], segmentPointerArray[tagId], BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize));
+    // if (prevPointerArray[tagId] != -1)
+    //     info("Tag is %i: %lu, %i, %i, %i, %i, %i", prevPointerArray[tagId], tagArray[prevPointerArray[tagId]] << lineBits, prevPointerArray[prevPointerArray[tagId]], nextPointerArray[prevPointerArray[tagId]], dataPointerArray[prevPointerArray[tagId]], segmentPointerArray[prevPointerArray[tagId]], BDICompressionToSize(compressionEncodingArray[prevPointerArray[tagId]], zinfo->lineSize));
+    // if (nextPointerArray[tagId] != -1)
+    //     info("Tag is %i: %lu, %i, %i, %i, %i, %i", nextPointerArray[tagId], tagArray[nextPointerArray[tagId]] << lineBits, prevPointerArray[nextPointerArray[tagId]], nextPointerArray[nextPointerArray[tagId]], dataPointerArray[nextPointerArray[tagId]], segmentPointerArray[nextPointerArray[tagId]], BDICompressionToSize(compressionEncodingArray[nextPointerArray[tagId]], zinfo->lineSize));
 }
 
 void ApproximateDedupBDITagArray::changeInPlace(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t segmentId, BDICompressionEncoding encoding, int32_t listHead, bool updateReplacement) {
+    if (!tagArray[tagId] && lineAddr) {
+        if (listHead == -1) {
+            dataValidSegments+=BDICompressionToSize(encoding, zinfo->lineSize)/8;
+        }
+        validLines++;
+    } else if (tagArray[tagId] && !lineAddr) {
+        validLines--;
+        assert(validLines);
+        if (nextPointerArray[tagId] == -1 && prevPointerArray[tagId] == -1) {
+            dataValidSegments-=BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize)/8;
+        }
+    } else if (nextPointerArray[tagId] == -1 && prevPointerArray[tagId] == -1) {
+        dataValidSegments-=BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize)/8;
+        dataValidSegments+=BDICompressionToSize(encoding, zinfo->lineSize)/8;
+    }
     tagArray[tagId] = lineAddr;
     dataPointerArray[tagId] = dataId;
     segmentPointerArray[tagId] = segmentId;
@@ -1267,9 +1564,13 @@ BDICompressionEncoding ApproximateDedupBDITagArray::readCompressionEncoding(int3
 }
 
 void ApproximateDedupBDITagArray::writeCompressionEncoding(int32_t tagId, BDICompressionEncoding encoding) {
+    // info("Tag was %i: %lu, %i, %i, %i, %i, %i", tagId, tagArray[tagId] << lineBits, prevPointerArray[tagId], nextPointerArray[tagId], dataPointerArray[tagId], segmentPointerArray[tagId], BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize));
+    assert (nextPointerArray[tagId] == -1 && prevPointerArray[tagId] == -1);
+    // info("CHANGE");
     dataValidSegments-=BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize)/8;
-    compressionEncodingArray[tagId] = encoding;
     dataValidSegments+=BDICompressionToSize(encoding, zinfo->lineSize)/8;
+    compressionEncodingArray[tagId] = encoding;
+    // info("Tag is %i: %lu, %i, %i, %i, %i, %i", tagId, tagArray[tagId] << lineBits, prevPointerArray[tagId], nextPointerArray[tagId], dataPointerArray[tagId], segmentPointerArray[tagId], BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize));
 }
 
 int32_t ApproximateDedupBDITagArray::readDataId(int32_t tagId) {
@@ -1305,7 +1606,7 @@ uint32_t ApproximateDedupBDITagArray::getDataValidSegments() {
 void ApproximateDedupBDITagArray::print() {
     for (uint32_t i = 0; i < this->numLines; i++) {
         if (dataPointerArray[i] != -1)
-            info("%i: %lu, %i, %i, %i", i, tagArray[i] << lineBits, prevPointerArray[i], nextPointerArray[i], dataPointerArray[i]);
+            info("%i: %lu, %i, %i, %i, %i", i, tagArray[i] << lineBits, prevPointerArray[i], nextPointerArray[i], dataPointerArray[i], segmentPointerArray[i]);
     }
 }
 
@@ -1384,21 +1685,6 @@ int32_t ApproximateDedupBDIDataArray::preinsert(int32_t dataId, int32_t* tagId, 
     return leastId;
 }
 
-// int32_t ApproximateDedupBDIDataArray::needEviction(int32_t dataId, const MemReq* req, uint16_t size, g_vector<uint32_t>& alreadyEvicted, Address* wbLineAddr) {
-//     uint16_t occupiedSpace = 0;
-//     for (uint32_t i = 0; i < assoc*zinfo->lineSize/8; i++)
-//         if (tagPointerArray[dataId][i] != -1)
-//             occupiedSpace += BDICompressionToSize(compressionEncodingArray[id], zinfo->lineSize);
-
-//     if (dataAssoc*zinfo->lineSize - occupiedSpace >= size)
-//         return -1;
-//     else {
-//         uint32_t candidate = rp->rank(req, SetAssocCands(first, first+assoc), alreadyEvicted);
-//         *wbLineAddr = tagArray[candidate];
-//         return candidate;
-//     }
-// }
-
 void ApproximateDedupBDIDataArray::postinsert(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, int32_t segmentId, DataLine data) {
     if (tagPointerArray[dataId][segmentId] == -1 && tagId != -1) {
         validLines++;
@@ -1407,8 +1693,10 @@ void ApproximateDedupBDIDataArray::postinsert(int32_t tagId, const MemReq* req, 
     }
     if (data)
         PIN_SafeCopy(compressedDataArray[dataId][segmentId], data, zinfo->lineSize);
+    // info("Data was %i,%i: %i, %i", dataId, segmentId, tagCounterArray[dataId][segmentId], tagPointerArray[dataId][segmentId]);
     tagCounterArray[dataId][segmentId] = counter;
     tagPointerArray[dataId][segmentId] = tagId;
+    // info("Data is %i,%i: %i, %i", dataId, segmentId, counter, tagId);
 }
 
 bool ApproximateDedupBDIDataArray::isSame(int32_t dataId, int32_t segmentId, DataLine data) {
@@ -1439,10 +1727,12 @@ uint32_t ApproximateDedupBDIDataArray::getValidLines() {
 }
 
 void ApproximateDedupBDIDataArray::print() {
-    // for (uint32_t i = 0; i < this->numLines; i++) {
-        // if (tagPointerArray[i] != -1)
-        //     info("%i: %i, %i", i, tagCounterArray[i], tagPointerArray[i]);
-    // }
+    for (uint32_t i = 0; i < numSets; i++) {
+        for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++) {
+            if (tagPointerArray[i][j] != -1)
+                info("%i,%i: %i, %i", i, j, tagCounterArray[i][j], tagPointerArray[i][j]);
+        }
+    }
 }
 
 ApproximateDedupBDIHashArray::ApproximateDedupBDIHashArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf, H3HashFamily* _dataHash) : rp(_rp), hf(_hf), dataHash(_dataHash), numLines(_numLines), assoc(_assoc)  {

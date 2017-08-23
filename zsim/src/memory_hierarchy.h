@@ -117,6 +117,7 @@ const char* AccessTypeName(AccessType t);
 const char* InvTypeName(InvType t);
 const char* MESIStateName(MESIState s);
 const char* DataTypeName(DataType t);
+const char* BDICompressionName(BDICompressionEncoding encoding);
 
 uint16_t BDICompressionToSize(BDICompressionEncoding encoding, uint32_t lineSize);
 

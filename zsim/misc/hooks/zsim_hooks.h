@@ -83,13 +83,13 @@ static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, D
     DataValue* maxValue = (DataValue*) malloc(sizeof(DataValue));
     if (Type == HOOKS_DOUBLE)
     {
-        minValue->HOOKS_DOUBLE = -512;
-        maxValue->HOOKS_DOUBLE = 512;
+        minValue->HOOKS_DOUBLE = 0;
+        maxValue->HOOKS_DOUBLE = 255;
     }
     else
     {
-        minValue->HOOKS_FLOAT = -512;
-	    maxValue->HOOKS_FLOAT = 512;
+        minValue->HOOKS_FLOAT = 0;
+	    maxValue->HOOKS_FLOAT = 255;
     }
     // __asm__ __volatile__
     // (

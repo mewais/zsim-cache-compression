@@ -206,16 +206,21 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                     int32_t victimListHeadId, newVictimListHeadId;
                     int32_t victimDataId = dataArray->preinsert(map, &req, &victimListHeadId);
                     uint64_t evBeginCycle = evictCycle;
+                    uint64_t evDoneCycle = evictCycle;
                     TimingRecord writebackRecord;
                     uint64_t lastEvDoneCycle = tagEvDoneCycle;
 
                     while (victimListHeadId != -1) {
-                        Address wbLineAddr = tagArray->readAddress(victimListHeadId);
-                        // info("\t\tEvicting tagId: %i", victimListHeadId);
-                        uint64_t evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
-                        // // info("\t\t\tEviction finished at %lu", evDoneCycle);
-                        newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
-                        tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
+                        if (victimListHeadId != victimTagId) {
+                            Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                            // info("\t\tEvicting tagId: %i", victimListHeadId);
+                            evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
+                            // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                            newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
+                            tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
+                        } else {
+                            newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
+                        }
                         if (evRec->hasRecord()) {
                             Evictions++;
                             writebackRecord.clear();
@@ -313,15 +318,20 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                     victimDataId = dataArray->preinsert(map, &req, &victimListHeadId);
                     evictCycle += accLat;
                     evBeginCycle = evictCycle;
+                    uint64_t evDoneCycle = evictCycle;
                     TimingRecord writebackRecord;
 
                     while (victimListHeadId != -1) {
-                        Address wbLineAddr = tagArray->readAddress(victimListHeadId);
-                        // info("\t\tEvicting tagId: %i", victimListHeadId);
-                        uint64_t evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
-                        // // info("\t\t\tEviction finished at %lu", evDoneCycle);
-                        newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
-                        tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
+                        if (victimListHeadId != victimTagId) {
+                            Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                            // info("\t\tEvicting tagId: %i", victimListHeadId);
+                            evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
+                            // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                            newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
+                            tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
+                        } else {
+                            newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
+                        }
                         if (evRec->hasRecord()) {
                             Evictions++;
                             writebackRecord.clear();
@@ -436,7 +446,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                         int32_t victimDataId = dataArray->preinsert(map, &req, &victimListHeadId);
                         respCycle += accLat;
                         uint64_t wbStartCycle = respCycle;
-                        uint64_t evDoneCycle;
+                        uint64_t evDoneCycle = respCycle;
                         TimingRecord writebackRecord;
 
                         uint64_t lastEvDoneCycle = respCycle;

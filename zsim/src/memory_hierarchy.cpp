@@ -29,6 +29,7 @@ static const char* accessTypeNames[] = {"GETS", "GETX", "PUTS", "PUTX"};
 static const char* invTypeNames[] = {"INV", "INVX"};
 static const char* mesiStateNames[] = {"I", "S", "E", "M"};
 static const char* dataTypeNames[] = {"UINT8", "INT8", "UINT16", "INT16", "UINT32", "INT32", "UINT64", "INT64", "FLOAT", "DOUBLE"};
+static const char* BDICompressionNames[] = {"ZERO", "REPETITIVE", "BASE8DELTA1", "BASE8DELTA2", "BASE8DELTA4", "BASE4DELTA1", "BASE4DELTA2", "BASE2DELTA1", "NONE"};
 
 const char* AccessTypeName(AccessType t) {
     assert_msg(t >= 0 && (size_t)t < sizeof(accessTypeNames)/sizeof(const char*), "AccessTypeName got an out-of-range input, %d", t);
@@ -48,6 +49,11 @@ const char* MESIStateName(MESIState s) {
 const char* DataTypeName(DataType t) {
     assert_msg(t >= 0 && (size_t)t < sizeof(dataTypeNames)/sizeof(const char*), "DataTypeName got an out-of-range input, %d", t);
     return dataTypeNames[t];
+}
+
+const char* BDICompressionName(BDICompressionEncoding encoding) {
+    assert_msg(encoding >= 0 && (size_t)encoding < sizeof(BDICompressionNames)/sizeof(const char*), "BDICompressionName got an out-of-range input, %d", encoding);
+    return BDICompressionNames[encoding];
 }
 
 uint16_t BDICompressionToSize(BDICompressionEncoding encoding, uint32_t lineSize) {

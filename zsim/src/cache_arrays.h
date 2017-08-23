@@ -192,8 +192,8 @@ class ApproximateBDITagArray {
 
 class ApproximateBDIDataArray {
     protected:
-        uint64_t my_llabs(int64_t x);
-        uint8_t multiBaseCompression(uint64_t* values, uint8_t size, uint8_t blimit, uint8_t bsize);
+        // uint64_t my_llabs(int64_t x);
+        // uint8_t multiBaseCompression(uint64_t* values, uint8_t size, uint8_t blimit, uint8_t bsize);
     public:
         // We can also generate bit masks here, but it will not affect the timing.
         BDICompressionEncoding compress(const DataLine data, uint16_t* size);
