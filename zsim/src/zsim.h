@@ -199,6 +199,7 @@ struct GlobSimInfo {
 
     uint32_t floatCutSize;
     uint32_t doubleCutSize;
+    uint16_t hashSize;
 };
 
 

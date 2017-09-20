@@ -280,7 +280,7 @@ class ApproximateDedupDataArray {
 
 class ApproximateDedupHashArray {
     protected:
-        uint64_t* hashArray;
+        int64_t* hashArray;
         int32_t* dataPointerArray;
         ReplPolicy* rp;
         HashFamily* hf;
@@ -292,12 +292,12 @@ class ApproximateDedupHashArray {
     public:
         ApproximateDedupHashArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf, H3HashFamily* _dataHash);
         ~ApproximateDedupHashArray();
-        int32_t lookup(uint64_t hash, const MemReq* req, bool updateReplacement);
-        int32_t preinsert(uint64_t hash, const MemReq* req);
-        void postinsert(uint64_t hash, const MemReq* req, int32_t dataPointer, int32_t hashId, bool updateReplacement);
+        int32_t lookup(int64_t hash, const MemReq* req, bool updateReplacement);
+        int32_t preinsert(int64_t hash, const MemReq* req);
+        void postinsert(int64_t hash, const MemReq* req, int32_t dataPointer, int32_t hashId, bool updateReplacement);
         int32_t readDataPointer(int32_t hashId);
         void approximate(const DataLine data, DataType type);
-        uint64_t hash(const DataLine data);
+        int64_t hash(const DataLine data);
         void print();
 };
 // Dedup End

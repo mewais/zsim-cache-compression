@@ -14,13 +14,13 @@ void zsim_heartbeat_() {
 }
 
 void zsim_mallocs_init_() {
-    zsim_mallocs_init();
+    // zsim_mallocs_init();
 }
 
 void zsim_allocate_approximate_(void* Start, uint64_t ByteLength, DataType Type) {
-    void zsim_allocate_approximate(Start, ByteLength, Type);
+    zsim_allocate_approximate(Start, ByteLength, Type);
 }
 
 void zsim_deallocate_approximate_(void* Start) {
-    void zsim_deallocate_approximate(Start);
+    zsim_deallocate_approximate(Start);
 }

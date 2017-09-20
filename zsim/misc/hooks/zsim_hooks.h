@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <float.h>
+#include <malloc.h>
 
 //Avoid optimizing compilers moving code around this barrier
 #define COMPILER_BARRIER() { __asm__ __volatile__("" ::: "memory");}
@@ -83,13 +84,13 @@ static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, D
     DataValue* maxValue = (DataValue*) malloc(sizeof(DataValue));
     if (Type == HOOKS_DOUBLE)
     {
-        minValue->HOOKS_DOUBLE = 0;
-        maxValue->HOOKS_DOUBLE = 255;
+        minValue->HOOKS_DOUBLE = -4.1588886540090808;
+        maxValue->HOOKS_DOUBLE = 5.0871395561061092;
     }
     else
     {
-        minValue->HOOKS_FLOAT = 0;
-	    maxValue->HOOKS_FLOAT = 255;
+        minValue->HOOKS_FLOAT = -4.1588886540090808;
+	    maxValue->HOOKS_FLOAT = 5.0871395561061092;
     }
     // __asm__ __volatile__
     // (

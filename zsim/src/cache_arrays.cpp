@@ -1280,7 +1280,7 @@ void ApproximateDedupDataArray::print() {
 }
 
 ApproximateDedupHashArray::ApproximateDedupHashArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf, H3HashFamily* _dataHash) : rp(_rp), hf(_hf), dataHash(_dataHash), numLines(_numLines), assoc(_assoc)  {
-    hashArray = gm_calloc<uint64_t>(numLines);
+    hashArray = gm_calloc<int64_t>(numLines);
     dataPointerArray = gm_malloc<int32_t>(numLines);
     for (uint32_t i = 0; i < numLines; i++) {
         dataPointerArray[i] = -1;
@@ -1295,7 +1295,7 @@ ApproximateDedupHashArray::~ApproximateDedupHashArray() {
     gm_free(dataPointerArray);
 }
 
-int32_t ApproximateDedupHashArray::lookup(uint64_t hash, const MemReq* req, bool updateReplacement) {
+int32_t ApproximateDedupHashArray::lookup(int64_t hash, const MemReq* req, bool updateReplacement) {
     uint32_t set = hf->hash(0, hash) & setMask;
     uint32_t first = set*assoc;
     for (uint32_t id = first; id < first + assoc; id++) {
@@ -1307,7 +1307,7 @@ int32_t ApproximateDedupHashArray::lookup(uint64_t hash, const MemReq* req, bool
     return -1;
 }
 
-int32_t ApproximateDedupHashArray::preinsert(uint64_t hash, const MemReq* req) {
+int32_t ApproximateDedupHashArray::preinsert(int64_t hash, const MemReq* req) {
     uint32_t set = hf->hash(0, hash) & setMask;
     uint32_t first = set*assoc;
 
@@ -1316,7 +1316,7 @@ int32_t ApproximateDedupHashArray::preinsert(uint64_t hash, const MemReq* req) {
     return candidate;
 }
 
-void ApproximateDedupHashArray::postinsert(uint64_t hash, const MemReq* req, int32_t dataPointer, int32_t hashId, bool updateReplacement) {
+void ApproximateDedupHashArray::postinsert(int64_t hash, const MemReq* req, int32_t dataPointer, int32_t hashId, bool updateReplacement) {
     rp->replaced(hashId);
     hashArray[hashId] = hash;
     dataPointerArray[hashId] = dataPointer;
@@ -1345,7 +1345,7 @@ void ApproximateDedupHashArray::approximate(const DataLine data, DataType type) 
     }
 }
 
-uint64_t ApproximateDedupHashArray::hash(const DataLine data)
+int64_t ApproximateDedupHashArray::hash(const DataLine data)
 {
     uint8_t _0;
     uint8_t _1;
@@ -1399,8 +1399,8 @@ uint64_t ApproximateDedupHashArray::hash(const DataLine data)
     uint64_t XORs =       ((uint64_t) _0) + (((uint64_t) _1) << 8)  + (((uint64_t) _2) << 16) + (((uint64_t) _3) << 24)
     + (((uint64_t) _4) << 32) + (((uint64_t) _5) << 40) + (((uint64_t) _6) << 48) + (((uint64_t) _7) << 56) ;
 
-    uint64_t hashKey = dataHash->hash(0,XORs) & setMask; // /*<< hashWayBits;*/
-    
+    int64_t hashKey = dataHash->hash(0,XORs) & ((uint64_t)std::pow(2, (zinfo->hashSize))-1); // /*<< hashWayBits;*/
+
     return hashKey;
 }
 
