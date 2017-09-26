@@ -1020,7 +1020,7 @@ void SimInit(const char* configFile, const char* outputDir, uint32_t shmid) {
     zinfo->mapSize = config.get<uint32_t>("sim.mapSize", 14);
     zinfo->floatCutSize = config.get<uint32_t>("sim.floatCutSize", 16);
     zinfo->doubleCutSize = config.get<uint32_t>("sim.doubleCutSize", 32);
-    zinfo->hashSize = config.get<uint16_t>("sim.hashSize", 16);
+    zinfo->hashSize = config.get<uint32_t>("sim.hashSize", 16);
 
     if (zinfo->traceDriven) {
         zinfo->numCores = 0;

@@ -845,7 +845,7 @@ unsigned multBaseCompression ( long long unsigned * values, unsigned size, unsig
      }
   }
   //return compressed size
-  unsigned mCompSize = blimit * compCount + bsize * BASES + (size - compCount) * bsize;
+  unsigned mCompSize = blimit * compCount + bsize * (BASES-1) + (size - compCount) * bsize;
   if(compCount < size)
      return size * bsize;
   //VG_(printf)("%d-bases bsize = %d osize = %d CompCount = %d CompSize = %d\n", BASES, bsize, blimit, compCount, mCompSize);
@@ -945,64 +945,10 @@ BDICompressionEncoding ApproximateBDIDataArray::compress(const DataLine data, ui
         // info("Compression: BASE8DELTA4, %i segments", 5);
         return BASE8DELTA4;
     }
-    *size = zinfo->lineSize;
-    // info("Compression: None, %i segments", 8);
-    return NONE;
-    
-    // bool Zero = true;
-    // bool Repetitive = true;
-    // for (uint16_t i = 0; i < zinfo->lineSize/8; i++)
-    // {
-    //     if (Zero && ((uint64_t*)data)[i] != 0)
-    //         Zero = false;
-    //     if (Repetitive && ((uint64_t*)data)[i] != ((uint64_t*)data)[0])
-    //         Repetitive = false;
-    //     if (!(Zero || Repetitive))
-    //         break;
-    // }
-    // if (Zero){                                                                                      // Size 1
-    //     *size = 8;
-    //     info("Compression: ZERO, %i segments", 1);
-    //     return ZERO;
-    // }
-    // if (Repetitive){                                                                                // Size 8
-    //     *size = 8;
-    //     info("Compression: REPETITIVE, %i segments", 1);
-    //     return REPETITIVE;
-    // }
-    // if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/8, 1, 8) != zinfo->lineSize){        // Size 16
-    //     *size = 16;
-    //     info("Compression: BASE8DELTA1, %i segments", 2);
-    //     return BASE8DELTA1;
-    // }
-    // if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/4, 1, 4) != zinfo->lineSize){        // Size 20
-    //     *size = 24;
-    //     info("Compression: BASE4DELTA1, %i segments", 3);
-    //     return BASE4DELTA1;
-    // }
-    // if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/8, 2, 8) != zinfo->lineSize){        // Size 24
-    //     *size = 24;
-    //     info("Compression: BASE8DELTA2, %i segments", 3);
-    //     return BASE8DELTA2;
-    // }
-    // if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/2, 1, 2) != zinfo->lineSize){        // Size 34
-    //     *size = 40;
-    //     info("Compression: BASE2DELTA1, %i segments", 5);
-    //     return BASE2DELTA1;
-    // }
-    // if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/4, 2, 4) != zinfo->lineSize){        // Size 36
-    //     *size = 40;
-    //     info("Compression: BASE4DELTA2, %i segments", 5);
-    //     return BASE4DELTA2;
-    // }
-    // if (multiBaseCompression((uint64_t*)data, zinfo->lineSize/8, 4, 8) != zinfo->lineSize){        // Size 40
-    //     *size = 40;
-    //     info("Compression: BASE8DELTA4, %i segments", 5);
-    //     return BASE8DELTA4;
-    // }
-    // *size = zinfo->lineSize;
-    // info("Compression: None, %i segments", 8);
-    // return NONE;
+    if (*size == zinfo->lineSize){
+        return NONE;
+    }
+    panic("impossible compress size %i", *size);
 }
 
 void ApproximateBDIDataArray::approximate(const DataLine data, DataType type) {
