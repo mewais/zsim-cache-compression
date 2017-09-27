@@ -569,9 +569,15 @@ int32_t ApproximateBDITagArray::needEviction(Address lineAddr, const MemReq* req
     uint32_t set = hf->hash(0, lineAddr) & setMask;
     uint32_t first = set*assoc;
     uint16_t occupiedSpace = 0;
-    for (uint32_t id = first; id < first + assoc; id++)
-        if (segmentPointerArray[id] != -1)
+    for (uint32_t id = first; id < first + assoc; id++) {
+        bool found = false;
+        for (uint32_t i = 0; i < alreadyEvicted.size(); i++) {
+            if (alreadyEvicted[i] == id) {found = true; break;}
+        }
+        if (segmentPointerArray[id] != -1 && !found) {
             occupiedSpace += BDICompressionToSize(compressionEncodingArray[id], zinfo->lineSize);
+        }
+    }
     if (dataAssoc*zinfo->lineSize - occupiedSpace >= size)
         return -1;
     else {
@@ -873,8 +879,8 @@ unsigned BDICompress (char * buffer, unsigned _blockSize)
   bestCSize = bestCSize > currCSize ? currCSize: bestCSize;
   free(values);
   values = convertBuffer2Array( buffer, _blockSize, 4);
-  if( isSameValuePackable( values, _blockSize / 4))
-      currCSize = 4;
+  // if( isSameValuePackable( values, _blockSize / 4))
+  //    currCSize = 4;
   bestCSize = bestCSize > currCSize ? currCSize: bestCSize;
   currCSize = multBaseCompression( values, _blockSize / 4, 1, 4);
   bestCSize = bestCSize > currCSize ? currCSize: bestCSize;
