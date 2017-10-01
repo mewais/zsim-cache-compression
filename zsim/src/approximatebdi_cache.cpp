@@ -242,8 +242,9 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                     Address wbLineAddr;
                     uint64_t evBeginCycle = respCycle + 1;
                     keptFromEvictions.push_back(tagId);
-                    int32_t victimTagId = tagArray->needEviction(req.lineAddr, &req, lineSize - BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize), keptFromEvictions, &wbLineAddr);
+                    int32_t victimTagId = tagArray->needEviction(req.lineAddr, &req, lineSize, keptFromEvictions, &wbLineAddr);
                     TimingRecord writebackRecord;
+                    if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                     uint64_t lastEvDoneCycle = tagEvDoneCycle;
                     while(victimTagId != -1) {
                         keptFromEvictions.push_back(victimTagId);
@@ -261,7 +262,7 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                             lastEvDoneCycle = evDoneCycle;
                             evBeginCycle += 1;
                         }
-                        victimTagId = tagArray->needEviction(req.lineAddr, &req, lineSize - BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize), keptFromEvictions, &wbLineAddr);
+                        victimTagId = tagArray->needEviction(req.lineAddr, &req, lineSize, keptFromEvictions, &wbLineAddr);
                     }
                     uint64_t getDoneCycle = respCycle;
                     respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
