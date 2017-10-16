@@ -28,6 +28,7 @@
 
 #include "memory_hierarchy.h"
 #include "stats.h"
+#include <random>
 
 /* General interface of a cache array. The array is a fixed-size associative container that
  * translates addresses to line IDs. A line ID represents the position of the tag. The other
@@ -257,6 +258,8 @@ class ApproximateDedupDataArray {
         uint32_t assoc;
         uint32_t setMask;
         uint32_t validLines;
+        std::mt19937* RNG;
+        std::uniform_int_distribution<>* DIST;
 
     public:
         ApproximateDedupDataArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
@@ -280,7 +283,7 @@ class ApproximateDedupDataArray {
 
 class ApproximateDedupHashArray {
     protected:
-        int64_t* hashArray;
+        uint64_t* hashArray;
         int32_t* dataPointerArray;
         ReplPolicy* rp;
         HashFamily* hf;
@@ -292,12 +295,12 @@ class ApproximateDedupHashArray {
     public:
         ApproximateDedupHashArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf, H3HashFamily* _dataHash);
         ~ApproximateDedupHashArray();
-        int32_t lookup(int64_t hash, const MemReq* req, bool updateReplacement);
-        int32_t preinsert(int64_t hash, const MemReq* req);
-        void postinsert(int64_t hash, const MemReq* req, int32_t dataPointer, int32_t hashId, bool updateReplacement);
+        int32_t lookup(uint64_t hash, const MemReq* req, bool updateReplacement);
+        int32_t preinsert(uint64_t hash, const MemReq* req);
+        void postinsert(uint64_t hash, const MemReq* req, int32_t dataPointer, int32_t hashId, bool updateReplacement);
         int32_t readDataPointer(int32_t hashId);
         void approximate(const DataLine data, DataType type);
-        int64_t hash(const DataLine data);
+        uint64_t hash(const DataLine data);
         void print();
 };
 // Dedup End
@@ -363,6 +366,8 @@ class ApproximateDedupBDIDataArray : public ApproximateBDIDataArray {
         uint32_t assoc;
         uint32_t setMask;
         uint32_t validLines;
+        std::mt19937* RNG;
+        std::uniform_int_distribution<>* DIST;
 
     public:
         ApproximateDedupBDIDataArray(uint32_t _numLines, uint32_t _assoc, HashFamily* _hf);

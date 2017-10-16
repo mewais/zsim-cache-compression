@@ -1130,7 +1130,10 @@ ApproximateDedupDataArray::ApproximateDedupDataArray(uint32_t _numLines, uint32_
     numSets = numLines/assoc;
     setMask = numSets - 1;
     validLines = 0;
-    srand (time(NULL));        
+    // srand (time(NULL));
+    std::random_device rd;
+    RNG = new std::mt19937(rd());
+    DIST = new std::uniform_int_distribution<>(0, numSets-1);
     assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
 }
 
@@ -1152,7 +1155,11 @@ int32_t ApproximateDedupDataArray::preinsert(int32_t* tagPointer) {
     int32_t leastValue = 999999;
     int32_t leastId = 0;
     for (uint32_t i = 0; i < 4; i++) {
-        int32_t id = rand() % numLines;
+        int32_t id = DIST->operator()(*RNG);
+        if (tagPointerArray[id] == -1) {
+            *tagPointer = tagPointerArray[id];
+            return id;
+        }
         if (tagCounterArray[id] < leastValue) {
             leastValue = tagCounterArray[id];
             leastId = id;
@@ -1232,10 +1239,11 @@ void ApproximateDedupDataArray::print() {
 }
 
 ApproximateDedupHashArray::ApproximateDedupHashArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf, H3HashFamily* _dataHash) : rp(_rp), hf(_hf), dataHash(_dataHash), numLines(_numLines), assoc(_assoc)  {
-    hashArray = gm_calloc<int64_t>(numLines);
+    hashArray = gm_malloc<uint64_t>(numLines);
     dataPointerArray = gm_malloc<int32_t>(numLines);
     for (uint32_t i = 0; i < numLines; i++) {
         dataPointerArray[i] = -1;
+        hashArray[i] = -1;
     }
     numSets = numLines/assoc;
     setMask = numSets - 1;
@@ -1247,7 +1255,7 @@ ApproximateDedupHashArray::~ApproximateDedupHashArray() {
     gm_free(dataPointerArray);
 }
 
-int32_t ApproximateDedupHashArray::lookup(int64_t hash, const MemReq* req, bool updateReplacement) {
+int32_t ApproximateDedupHashArray::lookup(uint64_t hash, const MemReq* req, bool updateReplacement) {
     uint32_t set = hf->hash(0, hash) & setMask;
     uint32_t first = set*assoc;
     for (uint32_t id = first; id < first + assoc; id++) {
@@ -1259,7 +1267,7 @@ int32_t ApproximateDedupHashArray::lookup(int64_t hash, const MemReq* req, bool 
     return -1;
 }
 
-int32_t ApproximateDedupHashArray::preinsert(int64_t hash, const MemReq* req) {
+int32_t ApproximateDedupHashArray::preinsert(uint64_t hash, const MemReq* req) {
     uint32_t set = hf->hash(0, hash) & setMask;
     uint32_t first = set*assoc;
 
@@ -1268,7 +1276,7 @@ int32_t ApproximateDedupHashArray::preinsert(int64_t hash, const MemReq* req) {
     return candidate;
 }
 
-void ApproximateDedupHashArray::postinsert(int64_t hash, const MemReq* req, int32_t dataPointer, int32_t hashId, bool updateReplacement) {
+void ApproximateDedupHashArray::postinsert(uint64_t hash, const MemReq* req, int32_t dataPointer, int32_t hashId, bool updateReplacement) {
     rp->replaced(hashId);
     hashArray[hashId] = hash;
     dataPointerArray[hashId] = dataPointer;
@@ -1297,7 +1305,7 @@ void ApproximateDedupHashArray::approximate(const DataLine data, DataType type) 
     }
 }
 
-int64_t ApproximateDedupHashArray::hash(const DataLine data)
+uint64_t ApproximateDedupHashArray::hash(const DataLine data)
 {
     uint8_t _0;
     uint8_t _1;
@@ -1351,7 +1359,7 @@ int64_t ApproximateDedupHashArray::hash(const DataLine data)
     uint64_t XORs =       ((uint64_t) _0) + (((uint64_t) _1) << 8)  + (((uint64_t) _2) << 16) + (((uint64_t) _3) << 24)
     + (((uint64_t) _4) << 32) + (((uint64_t) _5) << 40) + (((uint64_t) _6) << 48) + (((uint64_t) _7) << 56) ;
 
-    int64_t hashKey = dataHash->hash(0,XORs) & ((uint64_t)std::pow(2, (zinfo->hashSize))-1); // /*<< hashWayBits;*/
+    uint64_t hashKey = dataHash->hash(0,XORs) & ((uint64_t)std::pow(2, (zinfo->hashSize))-1); // /*<< hashWayBits;*/
 
     return hashKey;
 }
@@ -1579,7 +1587,10 @@ ApproximateDedupBDIDataArray::ApproximateDedupBDIDataArray(uint32_t _numLines, u
     }
     setMask = numSets - 1;
     validLines = 0;
-    srand (time(NULL));        
+    // srand (time(NULL));
+    std::random_device rd;
+    RNG = new std::mt19937(rd());
+    DIST = new std::uniform_int_distribution<>(0, numSets-1);
     assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
 }
 
@@ -1605,12 +1616,15 @@ int32_t ApproximateDedupBDIDataArray::preinsert() {
     int32_t leastValue = 999999;
     int32_t leastId = 0;
     for (uint32_t i = 0; i < 4; i++) {
-        int32_t id = rand() % numSets;
+        int32_t id = DIST->operator()(*RNG);
         int32_t counts = 0;
         for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++)
             counts += tagCounterArray[id][j];
+        if (counts == 0)
+            return id;
         if (counts < leastValue) {
             leastId = id;
+            leastValue = counts;
         }
     }
     return leastId;
@@ -1688,10 +1702,11 @@ void ApproximateDedupBDIDataArray::print() {
 }
 
 ApproximateDedupBDIHashArray::ApproximateDedupBDIHashArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf, H3HashFamily* _dataHash) : rp(_rp), hf(_hf), dataHash(_dataHash), numLines(_numLines), assoc(_assoc)  {
-    hashArray = gm_calloc<uint64_t>(numLines);
+    hashArray = gm_malloc<uint64_t>(numLines);
     dataPointerArray = gm_malloc<int32_t>(numLines);
     segmentPointerArray = gm_malloc<int32_t>(numLines);
     for (uint32_t i = 0; i < numLines; i++) {
+        hashArray[i] = -1;
         dataPointerArray[i] = -1;
         segmentPointerArray[i] = -1;
     }
@@ -1815,8 +1830,8 @@ uint64_t ApproximateDedupBDIHashArray::hash(const DataLine data)
     uint64_t XORs =       ((uint64_t) _0) + (((uint64_t) _1) << 8)  + (((uint64_t) _2) << 16) + (((uint64_t) _3) << 24)
     + (((uint64_t) _4) << 32) + (((uint64_t) _5) << 40) + (((uint64_t) _6) << 48) + (((uint64_t) _7) << 56) ;
 
-    uint64_t hashKey = dataHash->hash(0,XORs) & setMask; // /*<< hashWayBits;*/
-    
+    uint64_t hashKey = dataHash->hash(0,XORs) & ((uint64_t)std::pow(2, (zinfo->hashSize))-1); // /*<< hashWayBits;*/
+
     return hashKey;
 }
 

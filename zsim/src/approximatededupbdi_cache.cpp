@@ -146,8 +146,11 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                 dataArray->postinsert(newLLHead, &req, victimCounter-1, victimDataId, victimSegmentId, NULL);
                 // // info("SHOULDN'T1");
                 tagArray->postinsert(0, &req, victimTagId, -1, -1, NONE, -1, false);
-            } else {
+            } else if (victimDataId != -1 && victimSegmentId != -1) {
                 // // info("SHOULDN'T2");
+                uint32_t victimCounter = dataArray->readCounter(victimDataId, victimSegmentId);
+                int32_t LLHead = dataArray->readListHead(victimDataId, victimSegmentId);
+                dataArray->postinsert(LLHead, &req, victimCounter-1, victimDataId, victimSegmentId, NULL);
                 tagArray->postinsert(0, &req, victimTagId, -1, -1, NONE, -1, false);
             }
             if (evRec->hasRecord()) {
@@ -500,6 +503,10 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             // Change Tag
                             uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
                             dataArray->postinsert(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL);
+                        } else {
+                            uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
+                            int32_t LLHead = dataArray->readListHead(dataId, segmentId);
+                            dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL);
                         }
 
                         respCycle += accLat;
@@ -555,7 +562,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         tagArray->postinsert(req.lineAddr, &req, tagId, targetDataId, targetSegmentId, encoding, -1, true);
                         // info("postinsert %i", tagId);
                         dataArray->postinsert(tagId, &req, 1, targetDataId, targetSegmentId, data);
-                        hashArray->postinsert(hash, &req, targetDataId, targetSegmentId, hashId, true);
+                        hashArray->postinsert(hash, &req, targetDataId, targetSegmentId, hashId, updateReplacement);
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -594,6 +601,10 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             // Change Tag
                             uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
                             dataArray->postinsert(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL);
+                        } else {
+                            uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
+                            int32_t LLHead = dataArray->readListHead(dataId, segmentId);
+                            dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL);
                         }
                         // info("Data is also similar.");
                         int32_t oldListHead = dataArray->readListHead(targetDataId, targetSegmentId);
@@ -602,7 +613,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         tagArray->postinsert(req.lineAddr, &req, tagId, targetDataId, targetSegmentId, encoding, oldListHead, true);
                         // info("postinsert %i", tagId);
                         dataArray->postinsert(tagId, &req, dataCounter+1, targetDataId, targetSegmentId, NULL);
-                        hashArray->postinsert(hash, &req, targetDataId, targetSegmentId, hashId, true);
+                        hashArray->postinsert(hash, &req, targetDataId, targetSegmentId, hashId, updateReplacement);
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -673,7 +684,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             dataArray->writeData(dataId, segmentId, data, &req, true);
                             // // info("SHOULD CHANGE");
                             tagArray->writeCompressionEncoding(tagId, encoding);
-                            hashArray->postinsert(hash, &req, dataId, segmentId, hashId, true);
+                            hashArray->postinsert(hash, &req, dataId, segmentId, hashId, updateReplacement);
                             uint64_t getDoneCycle = respCycle;
                             respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -713,6 +724,10 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 // Change Tag
                                 uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
                                 dataArray->postinsert(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL);
+                            } else {
+                                uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
+                                int32_t LLHead = dataArray->readListHead(dataId, segmentId);
+                                dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL);
                             }
                             int32_t victimDataId = dataArray->preinsert();
 
@@ -768,7 +783,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, true);
                             // info("postinsert %i", tagId);
                             dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data);
-                            hashArray->postinsert(hash, &req, victimDataId, keptFromEvictions[0], hashId, true);
+                            hashArray->postinsert(hash, &req, victimDataId, keptFromEvictions[0], hashId, updateReplacement);
 
                             uint64_t getDoneCycle = respCycle;
                             respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
@@ -856,7 +871,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         // // info("SHOULD CHANGE");
                         tagArray->writeCompressionEncoding(tagId, encoding);
                         hashId = hashArray->preinsert(hash, &req);
-                        hashArray->postinsert(hash, &req, dataId, segmentId, hashId, true);
+                        hashArray->postinsert(hash, &req, dataId, segmentId, hashId, updateReplacement);
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -896,6 +911,10 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             // Change Tag
                             uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
                             dataArray->postinsert(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL);
+                        } else {
+                            uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
+                            int32_t LLHead = dataArray->readListHead(dataId, segmentId);
+                            dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL);
                         }
                         int32_t victimDataId = dataArray->preinsert();
 
@@ -952,7 +971,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         // info("postinsert %i", tagId);
                         dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data);
                         hashId = hashArray->preinsert(hash, &req);
-                        hashArray->postinsert(hash, &req, victimDataId, keptFromEvictions[0], hashId, true);
+                        hashArray->postinsert(hash, &req, victimDataId, keptFromEvictions[0], hashId, updateReplacement);
 
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);

@@ -142,6 +142,11 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                 // Change Tag
                 uint32_t victimCounter = dataArray->readCounter(victimDataId);
                 dataArray->changeInPlace(newLLHead, &req, victimCounter-1, victimDataId, approximateVictim, NULL, false);
+            } else if (victimDataId != -1) {
+                // info("\t\tAlso decremented dedup counter.");
+                uint32_t victimCounter = dataArray->readCounter(victimDataId);
+                int32_t LLHead = dataArray->readListHead(victimDataId);
+                dataArray->changeInPlace(LLHead, &req, victimCounter-1, victimDataId, approximateVictim, NULL, false);
             }
             tagArray->postinsert(0, &req, victimTagId, -1, -1, false, false);
             if (evRec->hasRecord()) {
@@ -208,7 +213,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, dataId, oldListHead, true, updateReplacement);
                     // info("postinsert %i with oldListHead %i", victimTagId, oldListHead);
                     dataArray->postinsert(victimTagId, &req, dataCounter+1, dataId, true, NULL, updateReplacement);
-                    hashArray->postinsert(hash, &req, victimDataId, hashId, true);
+                    hashArray->postinsert(hash, &req, hashArray->readDataPointer(hashId), hashId, true);
 
                     assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
 
@@ -395,6 +400,11 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             // Change Tag
                             uint32_t victimCounter = dataArray->readCounter(dataId);
                             dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
+                        } else {
+                            // info("\t\tAlso decremented dedup counter.");
+                            uint32_t victimCounter = dataArray->readCounter(dataId);
+                            int32_t LLHead = dataArray->readListHead(dataId);
+                            dataArray->changeInPlace(LLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
                         }
                         respCycle += accLat;
                         // info("Data line was evicted before. Taking over.");
@@ -441,6 +451,11 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             // Change Tag
                             uint32_t victimCounter = dataArray->readCounter(dataId);
                             dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
+                        } else {
+                            // info("\t\tAlso decremented dedup counter.");
+                            uint32_t victimCounter = dataArray->readCounter(dataId);
+                            int32_t LLHead = dataArray->readListHead(dataId);
+                            dataArray->changeInPlace(LLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
                         }
                         respCycle += 2*accLat;
                         int32_t oldListHead = dataArray->readListHead(targetDataId);
@@ -506,8 +521,12 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                                 // Change Tag
                                 uint32_t victimCounter = dataArray->readCounter(dataId);
                                 dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
+                            } else {
+                                // info("\t\tAlso decremented dedup counter.");
+                                uint32_t victimCounter = dataArray->readCounter(dataId);
+                                int32_t LLHead = dataArray->readListHead(dataId);
+                                dataArray->changeInPlace(LLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
                             }
-                            
                             evictCycle = respCycle + accLat;
                             respCycle += 2*accLat;
                             int32_t victimListHeadId, newVictimListHeadId;
@@ -606,8 +625,12 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             // Change Tag
                             uint32_t victimCounter = dataArray->readCounter(dataId);
                             dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
+                        } else {
+                            // info("\t\tAlso decremented dedup counter.");
+                            uint32_t victimCounter = dataArray->readCounter(dataId);
+                            int32_t LLHead = dataArray->readListHead(dataId);
+                            dataArray->changeInPlace(LLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
                         }
-                        
                         evictCycle = respCycle + accLat;
                         respCycle += 2*accLat;
                         int32_t victimListHeadId, newVictimListHeadId;
