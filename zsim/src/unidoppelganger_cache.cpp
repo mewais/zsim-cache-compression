@@ -452,6 +452,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                         uint64_t lastEvDoneCycle = respCycle;
 
                         while (victimListHeadId != -1) {
+                            if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             if (victimListHeadId != tagId) {
                                 Address wbLineAddr = tagArray->readAddress(victimListHeadId);
                                 // info("\t\tEvicting tagId %i associated with victim dataId %i", victimListHeadId, victimDataId);
