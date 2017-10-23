@@ -246,7 +246,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                     TimingRecord writebackRecord;
                     uint64_t lastEvDoneCycle = tagEvDoneCycle;
                     uint64_t evDoneCycle = evBeginCycle;
-
+                    if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                     while (victimListHeadId != -1) {
                         if (victimListHeadId != victimTagId) {
                             Address wbLineAddr = tagArray->readAddress(victimListHeadId);
@@ -315,7 +315,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                 TimingRecord writebackRecord;
                 uint64_t lastEvDoneCycle = tagEvDoneCycle;
                 uint64_t evDoneCycle = evBeginCycle;
-
+                if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                 while (victimListHeadId != -1) {
                     if (victimListHeadId != victimTagId) {
                         Address wbLineAddr = tagArray->readAddress(victimListHeadId);
@@ -408,7 +408,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         }
                         respCycle += accLat;
                         // info("Data line was evicted before. Taking over.");
-                        tagArray->postinsert(req.lineAddr, &req, tagId, targetDataId, -1, true, true);
+                        tagArray->changeInPlace(req.lineAddr, &req, tagId, targetDataId, -1, true, updateReplacement);
                         // info("postinsert %i", tagId);
                         dataArray->postinsert(tagId, &req, 1, targetDataId, true, data, true);
                         hashArray->postinsert(hash, &req, targetDataId, hashId, true);
@@ -461,7 +461,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         int32_t oldListHead = dataArray->readListHead(targetDataId);
                         // info("With a list head at %i", oldListHead);
                         uint32_t dataCounter = dataArray->readCounter(targetDataId);
-                        tagArray->postinsert(req.lineAddr, &req, tagId, targetDataId, oldListHead, true, updateReplacement);
+                        tagArray->changeInPlace(req.lineAddr, &req, tagId, targetDataId, oldListHead, true, updateReplacement);
                         // info("postinsert %i with oldListHead %i", tagId, oldListHead);
                         dataArray->postinsert(tagId, &req, dataCounter+1, targetDataId, true, NULL, updateReplacement);
                         hashArray->postinsert(hash, &req, targetDataId, hashId, true);
@@ -537,7 +537,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             uint64_t evDoneCycle = evBeginCycle;
                             TimingRecord writebackRecord;
                             uint64_t lastEvDoneCycle = tagEvDoneCycle;
-
+                            if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             while (victimListHeadId != -1) {
                                 if (victimListHeadId != tagId) {
                                     Address wbLineAddr = tagArray->readAddress(victimListHeadId);
@@ -641,7 +641,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         uint64_t evDoneCycle = evBeginCycle;
                         TimingRecord writebackRecord;
                         uint64_t lastEvDoneCycle = tagEvDoneCycle;
-
+                        if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                         while (victimListHeadId != -1) {
                             if (victimListHeadId != tagId) {
                                 Address wbLineAddr = tagArray->readAddress(victimListHeadId);
