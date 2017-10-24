@@ -408,6 +408,7 @@ class ApproximateDedupBDIHashArray {
         int32_t lookup(uint64_t hash, const MemReq* req, bool updateReplacement);
         int32_t preinsert(uint64_t hash, const MemReq* req);
         void postinsert(uint64_t hash, const MemReq* req, int32_t dataPointer, int32_t segmentPointer, int32_t hashId, bool updateReplacement);
+        void changeInPlace(uint64_t hash, const MemReq* req, int32_t dataPointer, int32_t segmentPointer, int32_t hashId, bool updateReplacement);
         int32_t readDataPointer(int32_t hashId);
         int32_t readSegmentPointer(int32_t hashId);
         void approximate(const DataLine data, DataType type);

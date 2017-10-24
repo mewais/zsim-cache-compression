@@ -278,7 +278,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
         dhashArray = new ApproximateDedupHashArray(hashLines, hashAssoc, hashRP, hf, hashCompression);
     } else if (arrayType == "ApproximateDedupBDI") {
         tagRP = new LRUReplPolicy<true>(numLines*tagRatio);
-        dbtagArray = new ApproximateDedupBDITagArray(numLines*tagRatio, ways, tagRP, hf);
+        dbtagArray = new ApproximateDedupBDITagArray(numLines*tagRatio, ways*tagRatio, tagRP, hf);
         dbdataArray = new ApproximateDedupBDIDataArray(numLines, ways, hf);
         uint32_t hashLines = config.get<uint32_t>(prefix + "hashLines", 64);
         uint32_t hashAssoc = config.get<uint32_t>(prefix + "hashAssoc", 8);
