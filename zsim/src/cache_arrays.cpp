@@ -1133,7 +1133,7 @@ ApproximateDedupDataArray::ApproximateDedupDataArray(uint32_t _numLines, uint32_
     // srand (time(NULL));
     std::random_device rd;
     RNG = new std::mt19937(rd());
-    DIST = new std::uniform_int_distribution<>(0, numSets-1);
+    DIST = new std::uniform_int_distribution<>(0, numLines-1);
     assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
 }
 
