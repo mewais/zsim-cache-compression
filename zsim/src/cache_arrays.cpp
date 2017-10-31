@@ -1642,6 +1642,10 @@ int32_t ApproximateDedupBDIDataArray::preinsert(int32_t dataId, int32_t* tagId, 
             }
         if (Found)
             continue;
+        if (tagCounterArray[dataId][j] == 0) {
+            *tagId = tagPointerArray[dataId][j];
+            return j;
+        }
         if (tagCounterArray[dataId][j] < leastValue) {
             leastValue = tagCounterArray[dataId][j];
             leastId = j;

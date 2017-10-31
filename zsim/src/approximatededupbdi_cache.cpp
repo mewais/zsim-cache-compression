@@ -185,7 +185,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     g_vector<uint32_t> keptFromEvictions;
                     uint64_t lastEvDoneCycle = evictCycle;
                     uint64_t evBeginCycle = evictCycle;
-                    while (freeSpace < lineSize) {
+                    do {
                         uint16_t occupiedSpace = 0;
                         for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
                             if (dataArray->readListHead(dataId, i) != -1)
@@ -193,6 +193,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         freeSpace = dataArray->getAssoc()*zinfo->lineSize - occupiedSpace;
                         int32_t victimListHeadId, newVictimListHeadId;
                         int32_t victimSegmentId = dataArray->preinsert(dataId, &victimListHeadId, keptFromEvictions);
+                        if (dataArray->readListHead(dataId, victimSegmentId) != -1)
+                            freeSpace += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(dataId, victimSegmentId)), zinfo->lineSize);
                         keptFromEvictions.push_back(victimSegmentId);
                         evBeginCycle += accLat;
                         uint64_t evDoneCycle = evBeginCycle;
@@ -223,10 +225,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             }
                             victimListHeadId = newVictimListHeadId;
                         }
-                        if (dataArray->readListHead(dataId, victimSegmentId) != -1)
-                            freeSpace += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(dataId, victimSegmentId)), zinfo->lineSize);
                         dataArray->postinsert(-1, &req, 0, dataId, victimSegmentId, NULL);
-                    }
+                    } while (freeSpace < lineSize);
                     // // info("SHOULD UP");
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, dataId, segmentId, encoding, -1, true);
                     // info("postinsert %i", victimTagId);
@@ -304,7 +304,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     g_vector<uint32_t> keptFromEvictions;
                     uint64_t lastEvDoneCycle = evictCycle;
                     uint64_t evBeginCycle = evictCycle;
-                    while (freeSpace < lineSize) {
+                    do {
                         uint16_t occupiedSpace = 0;
                         for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
                             if (dataArray->readListHead(victimDataId, i) != -1)
@@ -313,6 +313,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         // info("Free %i, lineSize %i", freeSpace, lineSize);
                         int32_t victimListHeadId, newVictimListHeadId;
                         int32_t victimSegmentId = dataArray->preinsert(victimDataId, &victimListHeadId, keptFromEvictions);
+                        if (dataArray->readListHead(victimDataId, victimSegmentId) != -1)
+                            freeSpace += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(victimDataId, victimSegmentId)), zinfo->lineSize);
                         keptFromEvictions.push_back(victimSegmentId);
                         evBeginCycle += accLat;
                         uint64_t evDoneCycle = evBeginCycle;
@@ -343,10 +345,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             }
                             victimListHeadId = newVictimListHeadId;
                         }
-                        if (dataArray->readListHead(victimDataId, victimSegmentId) != -1)
-                            freeSpace += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(victimDataId, victimSegmentId)), zinfo->lineSize);
                         dataArray->postinsert(-1, &req, 0, victimDataId, victimSegmentId, NULL);
-                    }
+                    } while (freeSpace < lineSize);
                     // // info("SHOULD UP");
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, victimDataId, keptFromEvictions[0], encoding, -1, true);
                     // info("postinsert %i", victimTagId);
@@ -394,7 +394,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                 g_vector<uint32_t> keptFromEvictions;
                 uint64_t lastEvDoneCycle = evictCycle;
                 uint64_t evBeginCycle = evictCycle;
-                while (freeSpace < lineSize) {
+                do {
                     uint16_t occupiedSpace = 0;
                     for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
                         if (dataArray->readListHead(victimDataId, i) != -1)
@@ -403,6 +403,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     // info("Free %i, lineSize %i", freeSpace, lineSize);
                     int32_t victimListHeadId, newVictimListHeadId;
                     int32_t victimSegmentId = dataArray->preinsert(victimDataId, &victimListHeadId, keptFromEvictions);
+                    if (dataArray->readListHead(victimDataId, victimSegmentId) != -1)
+                        freeSpace += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(victimDataId, victimSegmentId)), zinfo->lineSize);
                     keptFromEvictions.push_back(victimSegmentId);
                     evBeginCycle += accLat;
                     uint64_t evDoneCycle = evBeginCycle;
@@ -433,10 +435,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         }
                         victimListHeadId = newVictimListHeadId;
                     }
-                    if (dataArray->readListHead(victimDataId, victimSegmentId) != -1)
-                        freeSpace += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(victimDataId, victimSegmentId)), zinfo->lineSize);
                     dataArray->postinsert(-1, &req, 0, victimDataId, victimSegmentId, NULL);
-                }
+                } while (freeSpace < lineSize);
                 // // info("SHOULD UP");
                 tagArray->postinsert(req.lineAddr, &req, victimTagId, victimDataId, keptFromEvictions[0], encoding, -1, true);
                 // info("postinsert %i", victimTagId);
@@ -519,7 +519,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         g_vector<uint32_t> keptFromEvictions;
                         uint64_t lastEvDoneCycle = evictCycle;
                         uint64_t evBeginCycle = evictCycle;
-                        while (freeSpace < lineSize) {
+                        do {
                             uint16_t occupiedSpace = 0;
                             for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
                                 if (dataArray->readListHead(targetDataId, i) != -1)
@@ -527,6 +527,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             freeSpace = dataArray->getAssoc()*zinfo->lineSize - occupiedSpace;
                             int32_t victimListHeadId, newVictimListHeadId;
                             int32_t victimSegmentId = dataArray->preinsert(targetDataId, &victimListHeadId, keptFromEvictions);
+                            if (dataArray->readListHead(targetDataId, victimSegmentId) != -1)
+                                freeSpace += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(targetDataId, victimSegmentId)), zinfo->lineSize);
                             keptFromEvictions.push_back(victimSegmentId);
                             evBeginCycle += accLat;
                             uint64_t evDoneCycle = evBeginCycle;
@@ -557,10 +559,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 }
                                 victimListHeadId = newVictimListHeadId;
                             }
-                            if (dataArray->readListHead(targetDataId, victimSegmentId) != -1)
-                                freeSpace += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(targetDataId, victimSegmentId)), zinfo->lineSize);
                             dataArray->postinsert(-1, &req, 0, targetDataId, victimSegmentId, NULL);
-                        }
+                        } while (freeSpace < lineSize);
                         respCycle = lastEvDoneCycle;
                         // // info("SHOULD UP");
                         tagArray->postinsert(req.lineAddr, &req, tagId, targetDataId, targetSegmentId, encoding, -1, updateReplacement);
@@ -642,7 +642,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             evictCycle += accLat;
                             uint64_t lastEvDoneCycle = evictCycle;
                             uint64_t evBeginCycle = evictCycle;
-                            while (freeSpace + BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize) < lineSize) {
+                            do {
                                 uint16_t occupiedSpace = 0;
                                 for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
                                     if (dataArray->readListHead(victimDataId, i) != -1)
@@ -651,6 +651,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 // info("Free = %i, lineSize = %i", freeSpace, lineSize);
                                 int32_t victimListHeadId, newVictimListHeadId;
                                 int32_t victimSegmentId = dataArray->preinsert(victimDataId, &victimListHeadId, keptFromEvictions);
+                                if (dataArray->readListHead(victimDataId, victimSegmentId) != -1)
+                                    freeSpace += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(victimDataId, victimSegmentId)), zinfo->lineSize);
                                 keptFromEvictions.push_back(victimSegmentId);
                                 evBeginCycle += accLat;
                                 uint64_t evDoneCycle = evBeginCycle;
@@ -681,10 +683,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                     }
                                     victimListHeadId = newVictimListHeadId;
                                 }
-                                if (dataArray->readListHead(victimDataId, victimSegmentId) != -1)
-                                    freeSpace += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(victimDataId, victimSegmentId)), zinfo->lineSize);
                                 dataArray->postinsert(-1, &req, 0, victimDataId, victimSegmentId, NULL);
-                            }
+                            } while (freeSpace + BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize) < lineSize);
                             respCycle = lastEvDoneCycle;
                             dataArray->writeData(dataId, segmentId, data, &req, true);
                             // // info("SHOULD CHANGE");
@@ -735,6 +735,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL);
                             }
                             int32_t victimDataId = dataArray->preinsert();
+                            while (victimDataId == dataId)
+                                victimDataId = dataArray->preinsert();
 
                             // Now we need to know the available space in this set
                             uint16_t freeSpace = 0;
@@ -742,7 +744,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             evictCycle += accLat;
                             uint64_t lastEvDoneCycle = evictCycle;
                             uint64_t evBeginCycle = evictCycle;
-                            while (freeSpace < lineSize) {
+                            do {
                                 uint16_t occupiedSpace = 0;
                                 for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
                                     if (dataArray->readListHead(victimDataId, i) != -1)
@@ -750,6 +752,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 freeSpace = dataArray->getAssoc()*zinfo->lineSize - occupiedSpace;
                                 int32_t victimListHeadId, newVictimListHeadId;
                                 int32_t victimSegmentId = dataArray->preinsert(victimDataId, &victimListHeadId, keptFromEvictions);
+                                if (dataArray->readListHead(victimDataId, victimSegmentId) != -1)
+                                    freeSpace += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(victimDataId, victimSegmentId)), zinfo->lineSize);
                                 keptFromEvictions.push_back(victimSegmentId);
                                 evBeginCycle += accLat;
                                 uint64_t evDoneCycle = evBeginCycle;
@@ -780,10 +784,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                     }
                                     victimListHeadId = newVictimListHeadId;
                                 }
-                                if (dataArray->readListHead(victimDataId, victimSegmentId) != -1)
-                                    freeSpace += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(victimDataId, victimSegmentId)), zinfo->lineSize);
                                 dataArray->postinsert(-1, &req, 0, victimDataId, victimSegmentId, NULL);
-                            }
+                            } while (freeSpace < lineSize);
                             respCycle = lastEvDoneCycle;
                             // // info("SHOULD UP");
                             tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement);
@@ -831,7 +833,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         evictCycle += accLat;
                         uint64_t lastEvDoneCycle = evictCycle;
                         uint64_t evBeginCycle = evictCycle;
-                        while (freeSpace + BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize) < lineSize) {
+                        do {
                             uint16_t occupiedSpace = 0;
                             for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
                                 if (dataArray->readListHead(victimDataId, i) != -1)
@@ -872,7 +874,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             if (dataArray->readListHead(victimDataId, victimSegmentId) != -1)
                                 freeSpace += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(victimDataId, victimSegmentId)), zinfo->lineSize);
                             dataArray->postinsert(-1, &req, 0, victimDataId, victimSegmentId, NULL);
-                        }
+                        } while (freeSpace + BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize) < lineSize);
                         respCycle = lastEvDoneCycle;
                         dataArray->writeData(dataId, segmentId, data, &req, true);
                         // // info("SHOULD CHANGE");
@@ -924,6 +926,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL);
                         }
                         int32_t victimDataId = dataArray->preinsert();
+                        while (victimDataId == dataId)
+                            victimDataId = dataArray->preinsert();
 
                         // Now we need to know the available space in this set
                         uint16_t freeSpace = 0;
@@ -931,7 +935,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         evictCycle += accLat;
                         uint64_t lastEvDoneCycle = evictCycle;
                         uint64_t evBeginCycle = evictCycle;
-                        while (freeSpace < lineSize) {
+                        do {
                             uint16_t occupiedSpace = 0;
                             for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
                                 if (dataArray->readListHead(victimDataId, i) != -1)
@@ -939,6 +943,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             freeSpace = dataArray->getAssoc()*zinfo->lineSize - occupiedSpace;
                             int32_t victimListHeadId, newVictimListHeadId;
                             int32_t victimSegmentId = dataArray->preinsert(victimDataId, &victimListHeadId, keptFromEvictions);
+                            if (dataArray->readListHead(victimDataId, victimSegmentId) != -1)
+                                freeSpace += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(victimDataId, victimSegmentId)), zinfo->lineSize);
                             keptFromEvictions.push_back(victimSegmentId);
                             evBeginCycle += accLat;
                             uint64_t evDoneCycle = evBeginCycle;
@@ -969,10 +975,8 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 }
                                 victimListHeadId = newVictimListHeadId;
                             }
-                            if (dataArray->readListHead(victimDataId, victimSegmentId) != -1)
-                                freeSpace += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(victimDataId, victimSegmentId)), zinfo->lineSize);
                             dataArray->postinsert(-1, &req, 0, victimDataId, victimSegmentId, NULL);
-                        }
+                        } while (freeSpace < lineSize);
                         respCycle = lastEvDoneCycle;
                         // // info("SHOULD UP");
                         tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement);
@@ -1007,7 +1011,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         }
                         he->addChild(hwe, evRec);
                         tr.startEvent = tr.endEvent = he;
-                    }   
+                    }
                 }
             } else {
                 // info("\tHit Req");
