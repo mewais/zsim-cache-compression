@@ -50,7 +50,7 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
         }
     }
     PIN_SafeCopy(data, (void*)(readAddress << lineBits), zinfo->lineSize);
-    // // info("\tData type: %s, Data: %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", DataTypeName(type), ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3], ((float*)data)[4], ((float*)data)[5], ((float*)data)[6], ((float*)data)[7], ((float*)data)[8], ((float*)data)[9], ((float*)data)[10], ((float*)data)[11], ((float*)data)[12], ((float*)data)[13], ((float*)data)[14], ((float*)data)[15]);
+    // // // info("\tData type: %s, Data: %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", DataTypeName(type), ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3], ((float*)data)[4], ((float*)data)[5], ((float*)data)[6], ((float*)data)[7], ((float*)data)[8], ((float*)data)[9], ((float*)data)[10], ((float*)data)[11], ((float*)data)[12], ((float*)data)[13], ((float*)data)[14], ((float*)data)[15]);
 
     EventRecorder* evRec = zinfo->eventRecorders[req.srcId];
     assert_msg(evRec, "ApproximateBDI is not connected to TimingCore");
@@ -67,7 +67,7 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
 
             if (upLat) {
                 DelayEvent* dUp = new (evRec) DelayEvent(upLat);
-                // // info("uCREATE: %p at %u", dUp, __LINE__);
+                // // // info("uCREATE: %p at %u", dUp, __LINE__);
                 dUp->setMinStartCycle(startCycle);
                 startEv->addChild(dUp, evRec)->addChild(r->startEvent, evRec);
             } else {
@@ -76,7 +76,7 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
 
             if (downLat) {
                 DelayEvent* dDown = new (evRec) DelayEvent(downLat);
-                // // info("uCREATE: %p at %u", dDown, __LINE__);
+                // // // info("uCREATE: %p at %u", dDown, __LINE__);
                 dDown->setMinStartCycle(r->respCycle);
                 r->endEvent->addChild(dDown, evRec)->addChild(endEv, evRec);
             } else {
@@ -87,7 +87,7 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                 startEv->addChild(endEv, evRec);
             } else {
                 DelayEvent* dEv = new (evRec) DelayEvent(endCycle - startCycle);
-                // // info("uCREATE: %p at %u", dEv, __LINE__);
+                // // // info("uCREATE: %p at %u", dEv, __LINE__);
                 dEv->setMinStartCycle(startCycle);
                 startEv->addChild(dEv, evRec)->addChild(endEv, evRec);
             }
@@ -108,7 +108,9 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
 
     bool skipAccess = cc->startAccess(req); //may need to skip access due to races (NOTE: may change req.type!)
     if (likely(!skipAccess)) {
-        // info("%lu: REQ %s to address %lu", req.cycle, AccessTypeName(req.type), req.lineAddr << lineBits);
+        // info("%lu: REQ %s to address %lu in %s region", req.cycle, AccessTypeName(req.type), req.lineAddr << lineBits, approximate? "approximate":"exact");
+        // info("Req data type: %s, data: %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", DataTypeName(type), ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3], ((float*)data)[4], ((float*)data)[5], ((float*)data)[6], ((float*)data)[7], ((float*)data)[8], ((float*)data)[9], ((float*)data)[10], ((float*)data)[11], ((float*)data)[12], ((float*)data)[13], ((float*)data)[14], ((float*)data)[15]);
+
         bool updateReplacement = (req.type == GETS) || (req.type == GETX);
         int32_t tagId = tagArray->lookup(req.lineAddr, &req, updateReplacement);
         respCycle += accLat;
@@ -118,18 +120,20 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
         MissResponseEvent* mre;
         MissWritebackEvent* mwe;
         if (tagId == -1) {
-            // info("\t Miss Req");
+            // info("\tTag Miss");
             assert(cc->shouldAllocate(req));
             // Get the eviction candidate
             Address wbLineAddr;
             int32_t victimTagId = tagArray->preinsert(req.lineAddr, &req, &wbLineAddr); //find the lineId to replace
+            // info("\t\tEvicting tagId: %i", victimTagId);
             keptFromEvictions.push_back(victimTagId);
             trace(Cache, "[%s] Evicting 0x%lx", name.c_str(), wbLineAddr);
             // Need to evict the tag.
             tagEvDoneCycle = cc->processEviction(req, wbLineAddr, victimTagId, evictCycle);
-            // // info("\t\t\tEviction finished at %lu", tagEvDoneCycle);
+            // // // info("\t\t\tEviction finished at %lu", tagEvDoneCycle);
             if (evRec->hasRecord()) {
-                // info("\t\tEvicting tagId: %i", victimTagId);
+                // info("\t\tand its data of size %i segments", BDICompressionToSize(tagArray->readCompressionEncoding(victimTagId), zinfo->lineSize)/8);
+                // // info("\t\tEvicting tagId: %i", victimTagId);
                 Evictions++;
                 tagWritebackRecord.clear();
                 tagWritebackRecord = evRec->popRecord();
@@ -146,7 +150,7 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                 dataArray->approximate(data, type);
             uint16_t lineSize = 0;
             BDICompressionEncoding encoding = dataArray->compress(data, &lineSize);
-            // info("\tMiss Req Size: %u", lineSize);
+            // info("\tMiss Data Size: %u Segments", lineSize/8);
 
             // If the size of evicted line is not enough for the the compressed line
             // evict more
@@ -155,12 +159,15 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
             TimingRecord writebackRecord;
             uint64_t lastEvDoneCycle = tagEvDoneCycle;
             while(victimTagId2 != -1) {
+                // info("\t\tEvicting tagId: %i", victimTagId2);
                 keptFromEvictions.push_back(victimTagId2);
+                // uint32_t size = BDICompressionToSize(tagArray->readCompressionEncoding(victimTagId2), zinfo->lineSize)/8;
                 uint64_t evDoneCycle = cc->processEviction(req, wbLineAddr, victimTagId2, evBeginCycle);
-                // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                // // // info("\t\t\tEviction finished at %lu", evDoneCycle);
                 tagArray->postinsert(0, &req, victimTagId2, -1, NONE, false, false);
                 if (evRec->hasRecord()) {
-                    // info("\t\tEvicting tagId: %i", victimTagId2);
+                    // // info("\t\tEvicting tagId: %i", victimTagId2);
+                    // info("\t\tand freed %i segments", size);
                     Evictions++;
                     writebackRecord.clear();
                     writebackRecord = evRec->popRecord();
@@ -174,22 +181,22 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
             }
             tagArray->postinsert(req.lineAddr, &req, victimTagId, 0, encoding, approximate, true);
             mse = new (evRec) MissStartEvent(this, accLat, domain);
-            // // info("uCREATE: %p at %u", mse, __LINE__);
+            // // // info("uCREATE: %p at %u", mse, __LINE__);
             mre = new (evRec) MissResponseEvent(this, mse, domain);
-            // // info("uCREATE: %p at %u", mre, __LINE__);
+            // // // info("uCREATE: %p at %u", mre, __LINE__);
             mwe = new (evRec) MissWritebackEvent(this, mse, accLat, domain);
-            // // info("uCREATE: %p at %u", mwe, __LINE__);
+            // // // info("uCREATE: %p at %u", mwe, __LINE__);
             mse->setMinStartCycle(req.cycle);
-            // // info("\t\t\tMiss Start Event: %lu, %u", req.cycle, accLat);
+            // // // info("\t\t\tMiss Start Event: %lu, %u", req.cycle, accLat);
             mre->setMinStartCycle(respCycle);
-            // // info("\t\t\tMiss Response Event: %lu", respCycle);
+            // // // info("\t\t\tMiss Response Event: %lu", respCycle);
             mwe->setMinStartCycle(MAX(lastEvDoneCycle, tagEvDoneCycle));
-            // // info("\t\t\tMiss writeback event: %lu, %u", MAX(lastEvDoneCycle, tagEvDoneCycle), accLat);
+            // // // info("\t\t\tMiss writeback event: %lu, %u", MAX(lastEvDoneCycle, tagEvDoneCycle), accLat);
             connect(accessRecord.isValid()? &accessRecord : nullptr, mse, mre, req.cycle + accLat, respCycle);
             if(wbStartCycles.size()) {
                 for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                     DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - respCycle);
-                    // // info("uCREATE: %p at %u", del, __LINE__);
+                    // // // info("uCREATE: %p at %u", del, __LINE__);
                     del->setMinStartCycle(respCycle);
                     mre->addChild(del, evRec);
                     connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, mwe, wbStartCycles[i], wbEndCycles[i]);
@@ -203,42 +210,44 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
             tr.endEvent = mre;
         } else {
             if (req.type == PUTX) {
-                // info("\t PUTX Hit Req at tag: %i", tagId);
+                // info("\tWrite Tag Hit");
+                // // info("\t PUTX Hit Req at tag: %i", tagId);
                 // Now compress (and approximate) the new line
                 if (approximate)
                     dataArray->approximate(data, type);
                 uint16_t lineSize = 0;
                 BDICompressionEncoding encoding = dataArray->compress(data, &lineSize);
-                // info("\tPUTX Req Size: %u", lineSize);
+                // info("\tNew data size %i segments", BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize)/8);
+                // // info("\tPUTX Req Size: %u", lineSize);
 
                 // If size is the same
                 if (lineSize == BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize)) {
-                    // info("\tSize is the same.");
+                    // info("\t\tSize is the same as before, do nothing.");
                     uint64_t getDoneCycle = respCycle;
                     respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                     if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                     tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                     HitEvent* ev = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
-                    // // info("uCREATE: %p at %u", ev, __LINE__);
-                    // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
+                    // // // info("uCREATE: %p at %u", ev, __LINE__);
+                    // // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
                     ev->setMinStartCycle(req.cycle);
                     tr.startEvent = tr.endEvent = ev;
                 } else if (lineSize < BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize)) {
-                    // info("\tSize is smaller than before %i, adjusting.", BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize));
+                    // info("\tSize is smaller than before %i, compacting.", BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize)/8);
                     tagArray->writeCompressionEncoding(tagId, encoding);
                     uint64_t getDoneCycle = respCycle;
                     respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                     if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                     tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                     HitEvent* ev = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
-                    // // info("uCREATE: %p at %u", ev, __LINE__);
-                    // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
+                    // // // info("uCREATE: %p at %u", ev, __LINE__);
+                    // // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
                     ev->setMinStartCycle(req.cycle);
                     tr.startEvent = tr.endEvent = ev;
                 } else {
                     // If the size of evicted line is not enough for the the compressed line
                     // evict more
-                    // info("\tSize is bigger than before %i.", BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize));
+                    // info("\t\tSize is bigger than before %i", BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize)/8);
                     Address wbLineAddr;
                     uint64_t evBeginCycle = respCycle + 1;
                     keptFromEvictions.push_back(tagId);
@@ -247,12 +256,15 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                     if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                     uint64_t lastEvDoneCycle = tagEvDoneCycle;
                     while(victimTagId != -1) {
+                        // info("\t\tEvicting tagId: %i", victimTagId);
                         keptFromEvictions.push_back(victimTagId);
+                        // uint32_t size = BDICompressionToSize(tagArray->readCompressionEncoding(victimTagId), zinfo->lineSize)/8;
                         uint64_t evDoneCycle = cc->processEviction(req, wbLineAddr, victimTagId, evBeginCycle);
-                        // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                        // // // info("\t\t\tEviction finished at %lu", evDoneCycle);
                         tagArray->postinsert(0, &req, victimTagId, -1, NONE, false, false);
                         if (evRec->hasRecord()) {
-                            // info("\t\tEvicting tagId: %i", victimTagId);
+                            // info("\t\tand freed %i segments", size);
+                            // // info("\t\tEvicting tagId: %i", victimTagId);
                             Evictions++;
                             writebackRecord.clear();
                             writebackRecord = evRec->popRecord();
@@ -271,19 +283,19 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                     tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
 
                     HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
-                    // // info("uCREATE: %p at %u", he, __LINE__);
+                    // // // info("uCREATE: %p at %u", he, __LINE__);
                     aHitWritebackEvent* hwe = new (evRec) aHitWritebackEvent(this, he, respCycle - req.cycle, domain);
-                    // // info("uCREATE: %p at %u", hwe, __LINE__);
+                    // // // info("uCREATE: %p at %u", hwe, __LINE__);
 
                     he->setMinStartCycle(req.cycle);
                     hwe->setMinStartCycle(lastEvDoneCycle);
-                    // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
-                    // // info("\t\t\tHit writeback Event: %lu, %lu", lastEvDoneCycle, respCycle - req.cycle);
+                    // // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
+                    // // // info("\t\t\tHit writeback Event: %lu, %lu", lastEvDoneCycle, respCycle - req.cycle);
 
                     if(wbStartCycles.size()) {
                         for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                             DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                            // // info("uCREATE: %p at %u", del, __LINE__);
+                            // // // info("uCREATE: %p at %u", del, __LINE__);
                             del->setMinStartCycle(req.cycle + accLat);
                             he->addChild(del, evRec);
                             connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
@@ -293,14 +305,15 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                     tr.startEvent = tr.endEvent = he;
                 }
             } else {
-                // info("Hit Request at tag: %i", tagId);
+                // info("\tRead Tag Hit");
+                // // info("Hit Request at tag: %i", tagId);
                 uint64_t getDoneCycle = respCycle;
                 respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                 if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                 tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                 HitEvent* ev = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
-                // // info("uCREATE: %p at %u", ev, __LINE__);
-                // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
+                // // // info("uCREATE: %p at %u", ev, __LINE__);
+                // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
                 ev->setMinStartCycle(req.cycle);
                 tr.startEvent = tr.endEvent = ev;
             }
@@ -314,6 +327,10 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
 
     // info("Valid Tags: %u", tagArray->getValidLines());
     // info("Valid Lines: %u", tagArray->getDataValidSegments()/8);
+    // assert(tagArray->getValidLines() == tagArray->countValidLines());
+    // assert(tagArray->getDataValidSegments() == tagArray->countDataValidSegments());
+    assert(tagArray->getValidLines() <= numTagLines);
+    assert(tagArray->getDataValidSegments() <= numDataLines*8);
     assert(tagArray->getValidLines() >= tagArray->getDataValidSegments()/8);
     double sample = ((double)tagArray->getDataValidSegments()/8)/(double)tagArray->getValidLines();
     crStats->add(sample,1);
@@ -338,7 +355,7 @@ void ApproximateBDICache::simulateHitWriteback(aHitWritebackEvent* ev, uint64_t 
     uint64_t lookupCycle = tryLowPrioAccess(cycle);
     if (lookupCycle) { //success, release MSHR
         if (!pendingQueue.empty()) {
-            //// info("XXX %ld elems in pending queue", pendingQueue.size());
+            //// // info("XXX %ld elems in pending queue", pendingQueue.size());
             for (TimingEvent* qev : pendingQueue) {
                 qev->requeue(cycle+1);
             }

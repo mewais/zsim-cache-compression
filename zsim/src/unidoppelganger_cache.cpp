@@ -41,7 +41,7 @@ void uniDoppelgangerCache::initCacheStats(AggregateStat* cacheStat) {
 }
 
 uint64_t uniDoppelgangerCache::access(MemReq& req) {
-    // // info("%lu: REQ %s to address %lu.", req.cycle, AccessTypeName(req.type), req.lineAddr);
+    // // // info("%lu: REQ %s to address %lu.", req.cycle, AccessTypeName(req.type), req.lineAddr);
     DataLine data = gm_calloc<uint8_t>(zinfo->lineSize);
     DataType type = ZSIM_FLOAT;
     DataValue min, max;
@@ -78,7 +78,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
 
             if (upLat) {
                 DelayEvent* dUp = new (evRec) DelayEvent(upLat);
-                // // info("uCREATE: %p at %u", dUp, __LINE__);
+                // // // info("uCREATE: %p at %u", dUp, __LINE__);
                 dUp->setMinStartCycle(startCycle);
                 startEv->addChild(dUp, evRec)->addChild(r->startEvent, evRec);
             } else {
@@ -87,7 +87,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
 
             if (downLat) {
                 DelayEvent* dDown = new (evRec) DelayEvent(downLat);
-                // // info("uCREATE: %p at %u", dDown, __LINE__);
+                // // // info("uCREATE: %p at %u", dDown, __LINE__);
                 dDown->setMinStartCycle(r->respCycle);
                 r->endEvent->addChild(dDown, evRec)->addChild(endEv, evRec);
             } else {
@@ -98,7 +98,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                 startEv->addChild(endEv, evRec);
             } else {
                 DelayEvent* dEv = new (evRec) DelayEvent(endCycle - startCycle);
-                // // info("uCREATE: %p at %u", dEv, __LINE__);
+                // // // info("uCREATE: %p at %u", dEv, __LINE__);
                 dEv->setMinStartCycle(startCycle);
                 startEv->addChild(dEv, evRec)->addChild(endEv, evRec);
             }
@@ -118,6 +118,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
     bool skipAccess = cc->startAccess(req); //may need to skip access due to races (NOTE: may change req.type!)
     if (likely(!skipAccess)) {
         // info("%lu: REQ %s to address %lu", req.cycle, AccessTypeName(req.type), req.lineAddr << lineBits);
+        // info("Req data type: %s, data: %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", DataTypeName(type), ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3], ((float*)data)[4], ((float*)data)[5], ((float*)data)[6], ((float*)data)[7], ((float*)data)[8], ((float*)data)[9], ((float*)data)[10], ((float*)data)[11], ((float*)data)[12], ((float*)data)[13], ((float*)data)[14], ((float*)data)[15]);
         bool updateReplacement = (req.type == GETS) || (req.type == GETX);
         int32_t tagId = tagArray->lookup(req.lineAddr, &req, updateReplacement);
 
@@ -126,7 +127,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
         MissWritebackEvent* mwe;
         if (tagId == -1) {
             if (approximate) {
-                // info("\tApproximate Miss Req");
+                 // info("\tApproximate Tag Miss");
                 // Exact line, free a data line and a tag for it.
                 respCycle += accLat;
                 evictCycle += accLat;
@@ -140,7 +141,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                 // Need to evict the tag.
                 // info("\t\tEvicting tagId: %i", victimTagId);
                 tagEvDoneCycle = cc->processEviction(req, wbLineAddr, victimTagId, evictCycle);
-                // // info("\t\t\tEviction finished at %lu", tagEvDoneCycle);
+                // // // info("\t\t\tEviction finished at %lu", tagEvDoneCycle);
                 int32_t newLLHead;
                 bool approximateVictim;
                 bool evictDataLine = tagArray->evictAssociatedData(victimTagId, &newLLHead, &approximateVictim);
@@ -160,8 +161,8 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                     tagWritebackRecord = evRec->popRecord();
                 }
                 uint32_t map = dataArray->calculateMap(data, type, min, max);
-                // // info("\tMiss Req data type: %s, data: %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", DataTypeName(type), ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3], ((float*)data)[4], ((float*)data)[5], ((float*)data)[6], ((float*)data)[7], ((float*)data)[8], ((float*)data)[9], ((float*)data)[10], ((float*)data)[11], ((float*)data)[12], ((float*)data)[13], ((float*)data)[14], ((float*)data)[15]);
-                // info("\tMiss Req map: %u", map);
+                // // // info("\tMiss Req data type: %s, data: %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", DataTypeName(type), ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3], ((float*)data)[4], ((float*)data)[5], ((float*)data)[6], ((float*)data)[7], ((float*)data)[8], ((float*)data)[9], ((float*)data)[10], ((float*)data)[11], ((float*)data)[12], ((float*)data)[13], ((float*)data)[14], ((float*)data)[15]);
+                // info("\tMiss data map: %u", map);
                 int32_t mapId = dataArray->lookup(map, &req, updateReplacement);
 
                 // Need to get the line we want
@@ -171,7 +172,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                 if (evRec->hasRecord()) accessRecord = evRec->popRecord();
 
                 if (mapId != -1) {
-                    // info("\tSimilar map at: %i", mapId);
+                    // info("\t\tSimilar map at: %i", mapId);
                     // Found similar mtag, insert tag to the LL.
                     int32_t oldListHead = dataArray->readListHead(mapId);
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, mapId, oldListHead, true, updateReplacement);
@@ -180,18 +181,18 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                     assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
 
                     mse = new (evRec) MissStartEvent(this, accLat, domain);
-                    // // info("uCREATE: %p at %u", mse, __LINE__);
+                    // // // info("uCREATE: %p at %u", mse, __LINE__);
                     mre = new (evRec) MissResponseEvent(this, mse, domain);
-                    // // info("uCREATE: %p at %u", mre, __LINE__);
+                    // // // info("uCREATE: %p at %u", mre, __LINE__);
                     mwe = new (evRec) MissWritebackEvent(this, mse, accLat, domain);
-                    // // info("uCREATE: %p at %u", mwe, __LINE__);
+                    // // // info("uCREATE: %p at %u", mwe, __LINE__);
 
                     mse->setMinStartCycle(req.cycle);
-                    // // info("\t\t\tMiss Start Event: %lu, %u", req.cycle, accLat);
+                    // // // info("\t\t\tMiss Start Event: %lu, %u", req.cycle, accLat);
                     mre->setMinStartCycle(respCycle);
-                    // // info("\t\t\tMiss Response Event: %lu", respCycle);
+                    // // // info("\t\t\tMiss Response Event: %lu", respCycle);
                     mwe->setMinStartCycle(MAX(respCycle, tagEvDoneCycle));
-                    // // info("\t\t\tMiss writeback event: %lu, %u", MAX(respCycle, tagEvDoneCycle), accLat);
+                    // // // info("\t\t\tMiss writeback event: %lu, %u", MAX(respCycle, tagEvDoneCycle), accLat);
 
                     connect(accessRecord.isValid()? &accessRecord : nullptr, mse, mre, req.cycle + accLat, respCycle);
                     mre->addChild(mwe, evRec);
@@ -199,12 +200,13 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                         connect(tagWritebackRecord.isValid()? &tagWritebackRecord : nullptr, mse, mwe, req.cycle + accLat, tagEvDoneCycle);
                     }
                 } else {
-                    // info("\tNo similar map");
+                    // info("\t\tNo similar map");
                     // allocate new data/mtag and evict another if necessary,
                     // evict the tags associated with it too.
                     evictCycle = respCycle + accLat;
                     int32_t victimListHeadId, newVictimListHeadId;
                     int32_t victimDataId = dataArray->preinsert(map, &req, &victimListHeadId);
+                    // info("\t\tEvicting Data line %i", victimDataId);
                     uint64_t evBeginCycle = evictCycle;
                     uint64_t evDoneCycle = evictCycle;
                     TimingRecord writebackRecord;
@@ -213,9 +215,9 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                     while (victimListHeadId != -1) {
                         if (victimListHeadId != victimTagId) {
                             Address wbLineAddr = tagArray->readAddress(victimListHeadId);
-                            // info("\t\tEvicting tagId: %i", victimListHeadId);
+                            // info("\t\talong with tagId: %i", victimListHeadId);
                             evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
-                            // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                            // // // info("\t\t\tEviction finished at %lu", evDoneCycle);
                             newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                             tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
                         } else {
@@ -238,24 +240,24 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                     assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
 
                     mse = new (evRec) MissStartEvent(this, accLat, domain);
-                    // // info("uCREATE: %p at %u", mse, __LINE__);
+                    // // // info("uCREATE: %p at %u", mse, __LINE__);
                     mre = new (evRec) MissResponseEvent(this, mse, domain);
-                    // // info("uCREATE: %p at %u", mre, __LINE__);
+                    // // // info("uCREATE: %p at %u", mre, __LINE__);
                     mwe = new (evRec) MissWritebackEvent(this, mse, accLat, domain);
-                    // // info("uCREATE: %p at %u", mwe, __LINE__);
+                    // // // info("uCREATE: %p at %u", mwe, __LINE__);
 
                     mse->setMinStartCycle(req.cycle);
-                    // // info("\t\t\tMiss Start Event: %lu, %u", req.cycle, accLat);
+                    // // // info("\t\t\tMiss Start Event: %lu, %u", req.cycle, accLat);
                     mre->setMinStartCycle(respCycle);
-                    // // info("\t\t\tMiss Response Event: %lu", respCycle);
+                    // // // info("\t\t\tMiss Response Event: %lu", respCycle);
                     mwe->setMinStartCycle(MAX(lastEvDoneCycle, tagEvDoneCycle));
-                    // // info("\t\t\tMiss writeback event: %lu, %u", MAX(lastEvDoneCycle, tagEvDoneCycle), accLat);
+                    // // // info("\t\t\tMiss writeback event: %lu, %u", MAX(lastEvDoneCycle, tagEvDoneCycle), accLat);
 
                     connect(accessRecord.isValid()? &accessRecord : nullptr, mse, mre, req.cycle + accLat, respCycle);
                     if(wbStartCycles.size()) {
                         for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                             DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - respCycle);
-                            // // info("uCREATE: %p at %u", del, __LINE__);
+                            // // // info("uCREATE: %p at %u", del, __LINE__);
                             del->setMinStartCycle(respCycle);
                             mre->addChild(del, evRec);
                             connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, mwe, wbStartCycles[i], wbEndCycles[i]);
@@ -268,7 +270,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                 }
             } else {
                 // Miss, no tags found.
-                // info("\tExact Miss Req");
+                // info("\tExact Tag Miss");
                 respCycle += accLat;
                 evictCycle += accLat;
                 assert(cc->shouldAllocate(req));
@@ -281,7 +283,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                 // Need to evict the tag.
                 // info("\t\tEvicting tagId: %i", victimTagId);
                 tagEvDoneCycle = cc->processEviction(req, wbLineAddr, victimTagId, evictCycle);
-                // // info("\t\t\tEviction finished at %lu", tagEvDoneCycle);
+                // // // info("\t\t\tEviction finished at %lu", tagEvDoneCycle);
                 int32_t newLLHead;
                 bool approximateVictim;
                 bool evictDataLine = tagArray->evictAssociatedData(victimTagId, &newLLHead, &approximateVictim);
@@ -316,6 +318,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                     int32_t victimListHeadId, newVictimListHeadId;
                     uint32_t map = rand() % (uint32_t)std::pow(2, zinfo->mapSize-1);
                     victimDataId = dataArray->preinsert(map, &req, &victimListHeadId);
+                    // info("\t\tEvicting Data line %i", victimDataId);
                     evictCycle += accLat;
                     evBeginCycle = evictCycle;
                     uint64_t evDoneCycle = evictCycle;
@@ -324,9 +327,9 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                     while (victimListHeadId != -1) {
                         if (victimListHeadId != victimTagId) {
                             Address wbLineAddr = tagArray->readAddress(victimListHeadId);
-                            // info("\t\tEvicting tagId: %i", victimListHeadId);
+                            // info("\t\tAlong with tagId: %i", victimListHeadId);
                             evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
-                            // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                            // // // info("\t\t\tEviction finished at %lu", evDoneCycle);
                             newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                             tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
                         } else {
@@ -350,24 +353,24 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
 
                 assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
                 mse = new (evRec) MissStartEvent(this, accLat, domain);
-                // // info("uCREATE: %p at %u", mse, __LINE__);
+                // // // info("uCREATE: %p at %u", mse, __LINE__);
                 mre = new (evRec) MissResponseEvent(this, mse, domain);
-                // // info("uCREATE: %p at %u", mre, __LINE__);
+                // // // info("uCREATE: %p at %u", mre, __LINE__);
                 mwe = new (evRec) MissWritebackEvent(this, mse, accLat, domain);
-                // // info("uCREATE: %p at %u", mwe, __LINE__);
+                // // // info("uCREATE: %p at %u", mwe, __LINE__);
 
                 mse->setMinStartCycle(req.cycle);
-                // // info("\t\t\tMiss Start Event: %lu, %u", req.cycle, accLat);
+                // // // info("\t\t\tMiss Start Event: %lu, %u", req.cycle, accLat);
                 mre->setMinStartCycle(respCycle);
-                // // info("\t\t\tMiss Response Event: %lu", respCycle);
+                // // // info("\t\t\tMiss Response Event: %lu", respCycle);
                 mwe->setMinStartCycle(MAX(lastEvDoneCycle, tagEvDoneCycle));
-                // // info("\t\t\tMiss writeback event: %lu, %u", MAX(lastEvDoneCycle, tagEvDoneCycle), accLat);
+                // // // info("\t\t\tMiss writeback event: %lu, %u", MAX(lastEvDoneCycle, tagEvDoneCycle), accLat);
 
                 connect(accessRecord.isValid()? &accessRecord : nullptr, mse, mre, req.cycle + accLat, respCycle);
                 if(wbStartCycles.size()) {
                     for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                         DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                        // // info("uCREATE: %p at %u", del, __LINE__);
+                        // // // info("uCREATE: %p at %u", del, __LINE__);
                         del->setMinStartCycle(req.cycle + accLat);
                         mse->addChild(del, evRec);
                         connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, mwe, wbStartCycles[i], wbEndCycles[i]);
@@ -382,15 +385,17 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
             tr.endEvent = mre;
         } else {
             if (approximate && req.type == PUTX) {
+                // info("\tApproximate Write Tag Hit");
                 // If this is a write
                 uint32_t map = dataArray->calculateMap(data, type, min, max);
+                // info("\tHit data map: %u", map);
                 respCycle += accLat;
-                // // info("\tHit Req data type: %s, data: %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", DataTypeName(type), ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3], ((float*)data)[4], ((float*)data)[5], ((float*)data)[6], ((float*)data)[7], ((float*)data)[8], ((float*)data)[9], ((float*)data)[10], ((float*)data)[11], ((float*)data)[12], ((float*)data)[13], ((float*)data)[14], ((float*)data)[15]);
-                // info("\tHit PUTX Req map: %u, tagId = %i", map, tagId);
+                // // // info("\tHit Req data type: %s, data: %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", DataTypeName(type), ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3], ((float*)data)[4], ((float*)data)[5], ((float*)data)[6], ((float*)data)[7], ((float*)data)[8], ((float*)data)[9], ((float*)data)[10], ((float*)data)[11], ((float*)data)[12], ((float*)data)[13], ((float*)data)[14], ((float*)data)[15]);
+                // // info("\tHit PUTX Req map: %u, tagId = %i", map, tagId);
                 uint32_t previousMap = dataArray->readMap(tagArray->readMapId(tagId));
 
                 if (map == previousMap) {
-                    // info("\tMap not changed");
+                    // info("\tMap not different from before, nothing to do.");
                     // and its map is the same as before. Do nothing.
                     uint64_t getDoneCycle = respCycle;
                     respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
@@ -398,8 +403,8 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                     tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                     dataArray->lookup(map, &req, updateReplacement);
                     HitEvent* ev = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
-                    // // info("uCREATE: %p at %u", ev, __LINE__);
-                    // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
+                    // // // info("uCREATE: %p at %u", ev, __LINE__);
+                    // // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
                     ev->setMinStartCycle(req.cycle);
                     tr.startEvent = tr.endEvent = ev;
                 } else {
@@ -433,8 +438,8 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                         tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                         HitEvent* ev = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
-                        // // info("uCREATE: %p at %u", ev, __LINE__);
-                        // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
+                        // // // info("uCREATE: %p at %u", ev, __LINE__);
+                        // // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
                         ev->setMinStartCycle(req.cycle);
                         tr.startEvent = tr.endEvent = ev;
                     } else {
@@ -444,6 +449,7 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                         // have to.
                         int32_t victimListHeadId, newVictimListHeadId;
                         int32_t victimDataId = dataArray->preinsert(map, &req, &victimListHeadId);
+                        // info("\t\tEvicting Data line %i", victimDataId);
                         respCycle += accLat;
                         uint64_t wbStartCycle = respCycle;
                         uint64_t evDoneCycle = respCycle;
@@ -455,9 +461,9 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             if (victimListHeadId != tagId) {
                                 Address wbLineAddr = tagArray->readAddress(victimListHeadId);
-                                // info("\t\tEvicting tagId %i associated with victim dataId %i", victimListHeadId, victimDataId);
+                                // info("\t\tAlong with tagId %i", victimListHeadId);
                                 evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, wbStartCycle);
-                                // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                                // // // info("\t\t\tEviction finished at %lu", evDoneCycle);
                                 newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                 tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
                             } else {
@@ -500,19 +506,19 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                         tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
 
                         HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
-                        // // info("uCREATE: %p at %u", he, __LINE__);
+                        // // // info("uCREATE: %p at %u", he, __LINE__);
                         uHitWritebackEvent* hwe = new (evRec) uHitWritebackEvent(this, he, respCycle - req.cycle, domain);
-                        // // info("uCREATE: %p at %u", hwe, __LINE__);
+                        // // // info("uCREATE: %p at %u", hwe, __LINE__);
 
                         he->setMinStartCycle(req.cycle);
                         hwe->setMinStartCycle(lastEvDoneCycle);
-                        // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
-                        // // info("\t\t\tHit writeback Event: %lu, %lu", lastEvDoneCycle, respCycle - req.cycle);
+                        // // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
+                        // // // info("\t\t\tHit writeback Event: %lu, %lu", lastEvDoneCycle, respCycle - req.cycle);
 
                         if(wbStartCycles.size()) {
                             for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                                 DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                                // // info("uCREATE: %p at %u", del, __LINE__);
+                                // // // info("uCREATE: %p at %u", del, __LINE__);
                                 del->setMinStartCycle(req.cycle + accLat);
                                 he->addChild(del, evRec);
                                 connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
@@ -531,8 +537,8 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                 if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                 tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                 HitEvent* ev = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
-                // // info("uCREATE: %p at %u", ev, __LINE__);
-                // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
+                // // // info("uCREATE: %p at %u", ev, __LINE__);
+                // // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
                 ev->setMinStartCycle(req.cycle);
                 tr.startEvent = tr.endEvent = ev;
             }
@@ -546,9 +552,13 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
 
     cc->endAccess(req);
 
-    // // info("Valid Tags: %u", tagArray->getValidLines());
-    // // info("Valid Lines: %u", dataArray->getValidLines());
+    // info("Valid Tags: %u", tagArray->getValidLines());
+    // info("Valid Lines: %u", dataArray->getValidLines());
+    // assert(tagArray->getValidLines() == tagArray->countValidLines());
+    // assert(dataArray->getValidLines() == dataArray->countValidLines());
     assert(tagArray->getValidLines() >= dataArray->getValidLines());
+    assert(tagArray->getValidLines() <= numTagLines);
+    assert(dataArray->getValidLines() <= numDataLines);
     double sample = (double)dataArray->getValidLines()/(double)tagArray->getValidLines();
     crStats->add(sample,1);
 
@@ -572,7 +582,7 @@ void uniDoppelgangerCache::simulateHitWriteback(uHitWritebackEvent* ev, uint64_t
     uint64_t lookupCycle = tryLowPrioAccess(cycle);
     if (lookupCycle) { //success, release MSHR
         if (!pendingQueue.empty()) {
-            //// info("XXX %ld elems in pending queue", pendingQueue.size());
+            //// // info("XXX %ld elems in pending queue", pendingQueue.size());
             for (TimingEvent* qev : pendingQueue) {
                 qev->requeue(cycle+1);
             }

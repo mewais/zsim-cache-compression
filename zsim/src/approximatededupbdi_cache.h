@@ -11,6 +11,7 @@ class ApproximateDedupBDICache : public TimingCache {
         // Cache stuff
         uint32_t numTagLines;
         uint32_t numDataLines;
+        uint32_t dataAssoc;
 
         ApproximateDedupBDITagArray* tagArray;
         ApproximateDedupBDIDataArray* dataArray;

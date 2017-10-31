@@ -203,6 +203,15 @@ uint32_t uniDoppelgangerTagArray::getValidLines() {
     return validLines;
 }
 
+uint32_t uniDoppelgangerTagArray::countValidLines() {
+    uint32_t Counter = 0;
+    for (uint32_t i = 0; i < numLines; i++) {
+        if (mapPointerArray[i] != -1)
+            Counter++;
+    }
+    return Counter;
+}
+
 void uniDoppelgangerTagArray::print() {
     for (uint32_t i = 0; i < this->numLines; i++) {
         if (mapPointerArray[i] != -1)
@@ -516,6 +525,15 @@ void uniDoppelgangerDataArray::print() {
 uint32_t uniDoppelgangerDataArray::getValidLines() {
     return validLines;
 }
+
+uint32_t uniDoppelgangerDataArray::countValidLines() {
+    uint32_t Counter = 0;
+    for (uint32_t i = 0; i < numLines; i++) {
+        if (tagPointerArray[i] != -1)
+            Counter++;
+    }
+    return Counter;
+}
 // uniDoppelganger End
 
 // BDI Begin
@@ -626,8 +644,26 @@ uint32_t ApproximateBDITagArray::getValidLines() {
     return validLines;
 }
 
+uint32_t ApproximateBDITagArray::countValidLines() {
+    uint32_t Counter = 0;
+    for (uint32_t i = 0; i < numLines; i++) {
+        if (segmentPointerArray[i] != -1)
+            Counter++;
+    }
+    return Counter;
+}
+
 uint32_t ApproximateBDITagArray::getDataValidSegments() {
     return dataValidSegments;
+}
+
+uint32_t ApproximateBDITagArray::countDataValidSegments() {
+    uint32_t Counter = 0;
+    for (uint32_t i = 0; i < numLines; i++) {
+        if (segmentPointerArray[i] != -1)
+            Counter+=BDICompressionToSize(compressionEncodingArray[i], zinfo->lineSize)/8;
+    }
+    return Counter;
 }
 
 void ApproximateBDITagArray::print() {
@@ -1111,6 +1147,15 @@ uint32_t ApproximateDedupTagArray::getValidLines() {
     return validLines;
 }
 
+uint32_t ApproximateDedupTagArray::countValidLines() {
+    uint32_t Counter = 0;
+    for (uint32_t i = 0; i < numLines; i++) {
+        if (dataPointerArray[i] != -1)
+            Counter++;
+    }
+    return Counter;
+}
+
 void ApproximateDedupTagArray::print() {
     for (uint32_t i = 0; i < this->numLines; i++) {
         if (dataPointerArray[i] != -1)
@@ -1229,6 +1274,15 @@ void ApproximateDedupDataArray::writeData(int32_t dataId, DataLine data, const M
 
 uint32_t ApproximateDedupDataArray::getValidLines() {
     return validLines;
+}
+
+uint32_t ApproximateDedupDataArray::countValidLines() {
+    uint32_t Counter = 0;
+    for (uint32_t i = 0; i < numLines; i++) {
+        if (tagPointerArray[i] != -1)
+            Counter++;
+    }
+    return Counter;
 }
 
 void ApproximateDedupDataArray::print() {
@@ -1559,6 +1613,15 @@ uint32_t ApproximateDedupBDITagArray::getValidLines() {
     return validLines;
 }
 
+uint32_t ApproximateDedupBDITagArray::countValidLines() {
+    uint32_t Counter = 0;
+    for (uint32_t i = 0; i < numLines; i++) {
+        if (dataPointerArray[i] != -1)
+            Counter++;
+    }
+    return Counter;
+}
+
 uint32_t ApproximateDedupBDITagArray::getDataValidSegments() {
     return dataValidSegments;
 }
@@ -1642,10 +1705,6 @@ int32_t ApproximateDedupBDIDataArray::preinsert(int32_t dataId, int32_t* tagId, 
             }
         if (Found)
             continue;
-        if (tagCounterArray[dataId][j] == 0) {
-            *tagId = tagPointerArray[dataId][j];
-            return j;
-        }
         if (tagCounterArray[dataId][j] < leastValue) {
             leastValue = tagCounterArray[dataId][j];
             leastId = j;

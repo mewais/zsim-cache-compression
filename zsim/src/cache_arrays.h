@@ -114,6 +114,7 @@ class uniDoppelgangerTagArray {
         // returns next tagID in LL
         int32_t readNextLL(int32_t tagId);
         uint32_t getValidLines();
+        uint32_t countValidLines();
         void initStats(AggregateStat* parent) {}
         void print();
 };
@@ -148,6 +149,7 @@ class uniDoppelgangerDataArray {
         // returns map
         int32_t readMap(int32_t mapId);
         uint32_t getValidLines();
+        uint32_t countValidLines();
         void initStats(AggregateStat* parent) {}
         void print();
 };
@@ -186,7 +188,9 @@ class ApproximateBDITagArray {
         // returns segmentPointer
         int8_t readSegmentPointer(int32_t tagId);
         uint32_t getValidLines();
+        uint32_t countValidLines();
         uint32_t getDataValidSegments();
+        uint32_t countDataValidSegments();
         void initStats(AggregateStat* parent) {}
         void print();
 };
@@ -241,6 +245,7 @@ class ApproximateDedupTagArray {
         // returns next tagID in LL
         int32_t readPrevLL(int32_t tagId);
         uint32_t getValidLines();
+        uint32_t countValidLines();
         void initStats(AggregateStat* parent) {}
         void print();
 };
@@ -277,6 +282,7 @@ class ApproximateDedupDataArray {
         int32_t readCounter(int32_t dataId);
         DataLine readData(int32_t dataId);
         uint32_t getValidLines();
+        uint32_t countValidLines();
         void initStats(AggregateStat* parent) {}
         void print();
 };
@@ -350,6 +356,7 @@ class ApproximateDedupBDITagArray {
         int32_t readNextLL(int32_t tagId);
         int32_t readPrevLL(int32_t tagId);
         uint32_t getValidLines();
+        uint32_t countValidLines();
         uint32_t getDataValidSegments();
         void initStats(AggregateStat* parent) {}
         void print();
