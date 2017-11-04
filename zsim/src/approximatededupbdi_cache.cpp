@@ -208,7 +208,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         }
                         // info("\t\tEvicting dataline %i,%i", dataId, victimSegmentId);
                         keptFromEvictions.push_back(victimSegmentId);
-                        evBeginCycle += accLat;
                         uint64_t evDoneCycle = evBeginCycle;
                         TimingRecord writebackRecord;
                         lastEvDoneCycle = tagEvDoneCycle;
@@ -234,7 +233,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 wbStartCycles.push_back(evBeginCycle);
                                 wbEndCycles.push_back(evDoneCycle);
                                 lastEvDoneCycle = evDoneCycle;
-                                evBeginCycle += 1;
+                                evBeginCycle += accLat;
                             }
                             victimListHeadId = newVictimListHeadId;
                         }
@@ -337,7 +336,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         }
                         // info("\t\tEvicting dataline %i,%i", victimDataId, victimSegmentId);
                         keptFromEvictions.push_back(victimSegmentId);
-                        evBeginCycle += accLat;
                         uint64_t evDoneCycle = evBeginCycle;
                         TimingRecord writebackRecord;
                         lastEvDoneCycle = tagEvDoneCycle;
@@ -363,7 +361,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 wbStartCycles.push_back(evBeginCycle);
                                 wbEndCycles.push_back(evDoneCycle);
                                 lastEvDoneCycle = evDoneCycle;
-                                evBeginCycle += 1;
+                                evBeginCycle += accLat;
                             }
                             victimListHeadId = newVictimListHeadId;
                         }
@@ -436,7 +434,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     // info("\t\tEvicting dataline %i,%i", victimDataId, victimSegmentId);
 
                     keptFromEvictions.push_back(victimSegmentId);
-                    evBeginCycle += accLat;
                     uint64_t evDoneCycle = evBeginCycle;
                     TimingRecord writebackRecord;
                     lastEvDoneCycle = tagEvDoneCycle;
@@ -462,7 +459,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             wbStartCycles.push_back(evBeginCycle);
                             wbEndCycles.push_back(evDoneCycle);
                             lastEvDoneCycle = evDoneCycle;
-                            evBeginCycle += 1;
+                            evBeginCycle += accLat;
                         }
                         victimListHeadId = newVictimListHeadId;
                     }
@@ -575,7 +572,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             // info("\t\tEvicting dataline %i,%i", targetDataId, victimSegmentId);
 
                             keptFromEvictions.push_back(victimSegmentId);
-                            evBeginCycle += accLat;
                             uint64_t evDoneCycle = evBeginCycle;
                             TimingRecord writebackRecord;
                             lastEvDoneCycle = evBeginCycle;
@@ -601,7 +597,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                     wbStartCycles.push_back(evBeginCycle);
                                     wbEndCycles.push_back(evDoneCycle);
                                     lastEvDoneCycle = evDoneCycle;
-                                    evBeginCycle += 1;
+                                    evBeginCycle += accLat;
                                 }
                                 victimListHeadId = newVictimListHeadId;
                             }
@@ -711,7 +707,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 }
                                 // info("\t\tEvicting dataline %i,%i", victimDataId, victimSegmentId);
                                 keptFromEvictions.push_back(victimSegmentId);
-                                evBeginCycle += accLat;
                                 uint64_t evDoneCycle = evBeginCycle;
                                 TimingRecord writebackRecord;
                                 lastEvDoneCycle = evBeginCycle;
@@ -737,7 +732,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                         wbStartCycles.push_back(evBeginCycle);
                                         wbEndCycles.push_back(evDoneCycle);
                                         lastEvDoneCycle = evDoneCycle;
-                                        evBeginCycle += 1;
+                                        evBeginCycle += accLat;
                                     }
                                     victimListHeadId = newVictimListHeadId;
                                 }
@@ -822,7 +817,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 }
                                 // info("\t\tEvicting dataline %i,%i", victimDataId, victimSegmentId);
                                 keptFromEvictions.push_back(victimSegmentId);
-                                evBeginCycle += accLat;
                                 uint64_t evDoneCycle = evBeginCycle;
                                 TimingRecord writebackRecord;
                                 lastEvDoneCycle = evBeginCycle;
@@ -848,7 +842,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                         wbStartCycles.push_back(evBeginCycle);
                                         wbEndCycles.push_back(evDoneCycle);
                                         lastEvDoneCycle = evDoneCycle;
-                                        evBeginCycle += 1;
+                                        evBeginCycle += accLat;
                                     }
                                     victimListHeadId = newVictimListHeadId;
                                 }
@@ -920,7 +914,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             }
                             // info("\t\tEvicting dataline %i,%i", victimDataId, victimSegmentId);
                             keptFromEvictions.push_back(victimSegmentId);
-                            evBeginCycle += accLat;
                             uint64_t evDoneCycle = evBeginCycle;
                             TimingRecord writebackRecord;
                             lastEvDoneCycle = evBeginCycle;
@@ -946,7 +939,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                     wbStartCycles.push_back(evBeginCycle);
                                     wbEndCycles.push_back(evDoneCycle);
                                     lastEvDoneCycle = evDoneCycle;
-                                    evBeginCycle += 1;
+                                    evBeginCycle += accLat;
                                 }
                                 victimListHeadId = newVictimListHeadId;
                             }
@@ -1032,7 +1025,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             }
                             // info("\t\tEvicting dataline %i,%i", victimDataId, victimSegmentId);
                             keptFromEvictions.push_back(victimSegmentId);
-                            evBeginCycle += accLat;
                             uint64_t evDoneCycle = evBeginCycle;
                             TimingRecord writebackRecord;
                             lastEvDoneCycle = evBeginCycle;
@@ -1058,7 +1050,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                     wbStartCycles.push_back(evBeginCycle);
                                     wbEndCycles.push_back(evDoneCycle);
                                     lastEvDoneCycle = evDoneCycle;
-                                    evBeginCycle += 1;
+                                    evBeginCycle += accLat;
                                 }
                                 victimListHeadId = newVictimListHeadId;
                             }

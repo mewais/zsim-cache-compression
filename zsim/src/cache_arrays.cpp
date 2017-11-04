@@ -440,9 +440,9 @@ uint32_t uniDoppelgangerDataArray::calculateMap(const DataLine data, DataType ty
             }
             floatAvgHash = floatSum/(zinfo->lineSize/sizeof(float));
             floatRangeHash = floatMax - floatMin;
-            if (floatMax > maxValue.FLOAT)
+            // if (floatMax > maxValue.FLOAT)
                 // warn("Received a value bigger than the annotation's Max!! %.10f, %.10f", floatMax, maxValue.FLOAT);
-            if (floatMin < minValue.FLOAT)
+            // if (floatMin < minValue.FLOAT)
                 // warn("Received a value lower than the annotation's Min!! %.10f, %.10f", floatMin, minValue.FLOAT);
             mapStep = (maxValue.FLOAT - minValue.FLOAT)/std::pow(2,zinfo->mapSize-1);
             avgMap = floatAvgHash/mapStep;
@@ -458,9 +458,9 @@ uint32_t uniDoppelgangerDataArray::calculateMap(const DataLine data, DataType ty
             }
             floatAvgHash = floatSum/(zinfo->lineSize/sizeof(double));
             floatRangeHash = floatMax - floatMin;
-            if (floatMax > maxValue.DOUBLE)
+            // if (floatMax > maxValue.DOUBLE)
                 // warn("Received a value bigger than the annotation's Max!! %.10f, %.10f", floatMax, maxValue.DOUBLE);
-            if (floatMin < minValue.DOUBLE)
+            // if (floatMin < minValue.DOUBLE)
                 // warn("Received a value lower than the annotation's Min!! %.10f, %.10f", floatMin, minValue.DOUBLE);
             mapStep = (maxValue.DOUBLE - minValue.DOUBLE)/std::pow(2,zinfo->mapSize-1);
             avgMap = floatAvgHash/mapStep;
