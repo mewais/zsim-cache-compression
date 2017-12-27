@@ -29,6 +29,7 @@
 #include "memory_hierarchy.h"
 #include "stats.h"
 #include <random>
+#include "g_std/g_unordered_map.h"
 
 /* General interface of a cache array. The array is a fixed-size associative container that
  * translates addresses to line IDs. A line ID represents the position of the tag. The other
@@ -422,36 +423,178 @@ class ApproximateDedupBDIHashArray {
         uint64_t hash(const DataLine data);
         void print();
 };
-// class DedupApproximateBDIDataArray {
-//     protected:
-//         bool* approximateArray;
-//         int32_t* tagPointerArray;
-//         uint32_t* counterArray;
-//         ReplPolicy* rp;
-//         HashFamily* hf;
-//         uint32_t numLines;
-//         uint32_t validLines;
+// Dedup BDI End
 
-//     public:
-//         DedupApproximateBDIDataArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
-//         ~DedupApproximateBDIDataArray();
-//         // Returns the Index of the matching map, Must find.
-//         int32_t lookup(uint32_t map, const MemReq* req, bool updateReplacement);
-//         // Return the map of this data line
-//         uint32_t calculateMap(const DataLine data, DataType type, DataValue minValue, DataValue maxValue);
-//         // Returns candidate ID for insertion, tagID will point to a tag list head that need to be evicted.
-//         int32_t preinsert(uint32_t map, const MemReq* req, int32_t* tagId);
-//         // Actually inserts
-//         void postinsert(int32_t map, const MemReq* req, int32_t mapId, int32_t tagId, bool approximate, bool updateReplacement);
-//         // returns tagId
-//         int32_t readListHead(int32_t mapId);
-//         // returns map
-//         int32_t readMap(int32_t mapId);
-//         uint32_t getValidLines();
-//         void initStats(AggregateStat* parent) {}
-//         void print();
-// };
-// BDI End
+// Doppelganger BDI Begin
+class uniDoppelgangerBDITagArray {
+    protected:
+        bool* approximateArray;
+        Address* tagArray;
+        int32_t* prevPointerArray;
+        int32_t* nextPointerArray;
+        int32_t* mapPointerArray; // Or directly data array.
+        int32_t* segmentPointerArray;
+        ReplPolicy* rp;
+        HashFamily* hf;
+        uint32_t numLines;
+        uint32_t numSets;
+        uint32_t assoc;
+        uint32_t setMask;
+        uint32_t validLines;
+
+    public:
+        uniDoppelgangerBDITagArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
+        ~uniDoppelgangerBDITagArray();
+        // Returns the Index of the matching tag, or -1 if none found.
+        int32_t lookup(Address lineAddr, const MemReq* req, bool updateReplacement);
+        // Returns candidate Index for insertion, wbLineAddr will point to its address for eviction.
+        int32_t preinsert(Address lineAddr, const MemReq* req, Address* wbLineAddr);
+        // returns a true if we should evict the associated map/data line. newLLHead is the Index of the new
+        // LinkedList Head to pointed to from the data array.
+        bool evictAssociatedData(int32_t lineId, int32_t* newLLHead, bool* approximate);
+        // Actually inserts
+        void postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t mapId, int32_t segmentId, int32_t listHead, bool approximate, bool updateReplacement);
+        void changeInPlace(Address lineAddr, const MemReq* req, int32_t tagId, int32_t mapId, int32_t segmentId, int32_t listHead, bool approximate, bool updateReplacement);
+        // returns mapId
+        int32_t readMapId(int32_t tagId);
+        int32_t readSegmentId(int32_t tagId);
+        // returns dataId
+        int32_t readDataId(int32_t tagId);
+        // returns address
+        Address readAddress(int32_t tagId);
+        // returns next tagID in LL
+        int32_t readNextLL(int32_t tagId);
+        uint32_t getValidLines();
+        uint32_t countValidLines();
+        void initStats(AggregateStat* parent) {}
+        void print();
+};
+
+class uniDoppelgangerBDIDataArray : public ApproximateBDIDataArray {
+    protected:
+        bool** approximateArray;
+        int32_t** mtagArray;
+        int32_t** tagPointerArray;
+        int32_t** tagCounterArray;
+        BDICompressionEncoding** compressionEncodingArray;
+        ReplPolicy* rp;
+        HashFamily* hf;
+        uint32_t numLines;
+        uint32_t numSets;
+        uint32_t assoc;
+        uint32_t setMask;
+        uint32_t validSegments;
+        uint32_t tagRatio;
+    public:
+        uniDoppelgangerBDIDataArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf, uint32_t _tagRatio);
+        ~uniDoppelgangerBDIDataArray();
+        // Returns the Index of the matching map, Must find.
+        int32_t lookup(uint32_t map);
+        int32_t lookup(uint32_t map, uint32_t mapId, const MemReq* req, bool updateReplacement);
+        // Return the map of this data line
+        uint32_t calculateMap(const DataLine data, DataType type, DataValue minValue, DataValue maxValue);
+        // Returns candidate ID for insertion, tagID will point to a tag list head that need to be evicted.
+        int32_t preinsert(uint32_t map);
+        int32_t preinsert(uint32_t set, const MemReq* req, int32_t* tagId, g_vector<uint32_t>& exceptions);
+        // Actually inserts
+        void postinsert(int32_t map, const MemReq* req, int32_t mapId, int32_t segmentId, int32_t tagId, int32_t counter, BDICompressionEncoding compression, bool approximate, bool updateReplacement);
+        void changeInPlace(int32_t map, const MemReq* req, int32_t mapId, int32_t segmentId, int32_t tagId, int32_t counter, BDICompressionEncoding compression, bool approximate, bool updateReplacement);
+        // returns tagId
+        int32_t readListHead(int32_t mapId, int32_t segmentId);
+        int32_t readCounter(int32_t mapId, int32_t segmentId);
+        bool readApproximate(int32_t mapId, int32_t segmentId);
+        // returns map
+        int32_t readMap(int32_t mapId, int32_t segmentId);
+        BDICompressionEncoding readCompressionEncoding(int32_t mapId, int32_t segmentId);
+        uint32_t getValidSegments();
+        // uint32_t countValidLines();
+        void initStats(AggregateStat* parent) {}
+        uint32_t getAssoc() {return assoc;}
+        uint32_t getRatio() {return tagRatio;}
+        void print();
+};
+// Doppelganger BDI End
+
+// GDISH Begin
+class GDishTagArray {
+    protected:
+        Address* tagArray;
+        uint64_t* timestampArray;
+        bool* approximateArray;
+        GDISHCompressionType* compressionArray;
+        int32_t* segmentPointerArray;
+        g_vector<uint32_t>* dataArray;   // Should be in data array
+        ReplPolicy* rp;
+        HashFamily* hf;
+        uint32_t numLines;
+        uint32_t numSets;
+        uint32_t numDictEntries;
+        uint32_t assoc;
+        uint32_t dataAssoc;
+        uint32_t setMask;
+        uint64_t validLines;
+        uint64_t dataValidSegments;
+    public:
+        GDishTagArray(uint32_t _numLines, uint32_t _assoc, uint32_t _dataAssoc, uint32_t _numDictEntries, ReplPolicy* _rp, HashFamily* _hf);
+
+        int32_t lookup(const Address lineAddr, const MemReq* req, bool updateReplacement);
+        uint32_t preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr);
+        int32_t needEviction(Address lineAddr, const MemReq* req, uint16_t size, g_vector<uint32_t>& alreadyEvicted, Address* wbLineAddr);
+        void postinsert(const Address lineAddr, const MemReq* req, uint32_t tagId, uint64_t timestamp, GDISHCompressionType compression, uint8_t segmentId, g_vector<uint32_t>& dicts, bool approximate);
+        GDISHCompressionType readCompressionType(int32_t tagId);
+        // returns segmentPointer
+        int32_t readSegmentPointer(int32_t tagId);
+        uint64_t readTimestamp(int32_t tagId);
+        uint32_t getValidLines();
+        uint32_t countValidLines();
+        uint32_t getDataValidSegments();
+        uint32_t countDataValidSegments();
+        bool readApproximate(uint32_t tagId);
+        g_vector<uint32_t> readDictIndices(int32_t tagId);
+        uint32_t readNumDicts(int32_t tagId, GDISHCompressionType scheme);
+        void initStats(AggregateStat* parent) {}
+        void print();
+};
+
+class GDishDataArray {
+    public:
+        void compress(const DataLine data, g_vector<uint32_t>& DISH1, g_vector<uint32_t>& DISH2);
+        void approximate(const DataLine data, DataType type);
+};
+
+class GDishDedupArray {
+    protected:
+        int32_t* tagCounterArray;
+        DataLine* dataArray;
+        uint64_t* timestampArray;
+        uint32_t numLines;
+    public:
+        GDishDedupArray(uint32_t _numLines);
+        ~GDishDedupArray();
+        int32_t exists(DataLine data);
+        int32_t preinsert(int32_t* count);
+        void postinsert(int32_t id, DataLine data, uint64_t timestamp);
+        void increaseCounter(int32_t id);
+        void decreaseCounter(int32_t id);
+        int64_t readTimestamp(int32_t id);
+        void print();
+};
+
+class GDishDictionary {
+    protected:
+        uint32_t* DictArray;
+        g_vector<int32_t>* IndexListArray;
+        uint64_t* timestampArray;
+        uint32_t numLines;
+    public:
+        GDishDictionary(uint32_t _numLines);
+        int32_t exists(int32_t dict, GDISHCompressionType scheme);
+        void increaseCounter(int32_t id);
+        void decreaseCounter(int32_t id);
+        g_vector<int64_t> readTimestamps(g_vector<int32_t> indices);
+        uint32_t getNumLines();
+};
+// GDISH End
 
 /* The cache array that started this simulator :) */
 class ZArray : public CacheArray {

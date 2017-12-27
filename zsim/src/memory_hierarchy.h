@@ -93,6 +93,13 @@ typedef enum {
     NONE,
 } BDICompressionEncoding;
 
+enum GDISHCompressionType {
+    NONE,
+    SCHEME1,
+    SCHEME2,
+    Dedup
+};
+
 union DataValue
 {
     uint8_t UINT8;
@@ -118,6 +125,7 @@ const char* InvTypeName(InvType t);
 const char* MESIStateName(MESIState s);
 const char* DataTypeName(DataType t);
 const char* BDICompressionName(BDICompressionEncoding encoding);
+const char* GDISHCompressionName(GDISHCompressionType encoding);
 
 uint16_t BDICompressionToSize(BDICompressionEncoding encoding, uint32_t lineSize);
 

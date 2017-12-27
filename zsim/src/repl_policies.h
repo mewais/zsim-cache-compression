@@ -202,7 +202,24 @@ class DataLRUReplPolicy : public ReplPolicy {
             return bestCand;
         }
 
-        uint32_t rank(const MemReq* req, SetAssocCands cands, g_vector<uint32_t>& exceptions) {panic("No"); return 0;}
+        uint32_t rank(const MemReq* req, SetAssocCands cands, g_vector<uint32_t>& exceptions) {
+            uint32_t bestCand = -1;
+            uint64_t bestScore = (uint64_t)-1L;
+            for (SetAssocCands::iterator ci = cands.begin(); ci != cands.end(); ci.inc()) {
+                bool Found = false;
+                for (uint32_t i = 0; i < exceptions.size(); i++)
+                    if (ci.x == exceptions[i]) {
+                        Found = true;
+                        break;
+                    }
+                if (Found)
+                    continue;
+                uint32_t s = score(*ci);
+                bestCand = (s < bestScore)? *ci : bestCand;
+                bestScore = MIN(s, bestScore);
+            }
+            return bestCand;
+        }
 
         DECL_RANK_BINDINGS;
 

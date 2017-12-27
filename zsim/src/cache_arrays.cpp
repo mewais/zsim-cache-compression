@@ -1913,6 +1913,767 @@ void ApproximateDedupBDIHashArray::print() {
 }
 // BDI and ApproximateBDI End
 
+// uniDoppelganger BDI Start
+uniDoppelgangerBDITagArray::uniDoppelgangerBDITagArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf) : rp(_rp), hf(_hf), numLines(_numLines), assoc(_assoc)  {
+    tagArray = gm_calloc<Address>(numLines);
+    prevPointerArray = gm_calloc<int32_t>(numLines);
+    nextPointerArray = gm_calloc<int32_t>(numLines);
+    mapPointerArray = gm_calloc<int32_t>(numLines);
+    segmentPointerArray = gm_calloc<int32_t>(numLines);
+    approximateArray = gm_calloc<bool>(numLines);
+    for (uint32_t i = 0; i < numLines; i++) {
+        prevPointerArray[i] = -1;
+        nextPointerArray[i] = -1;
+        mapPointerArray[i] = -1;
+        segmentPointerArray[i] = -1;
+    }
+    numSets = numLines/assoc;
+    setMask = numSets - 1;
+    validLines = 0;
+    assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
+}
+
+uniDoppelgangerBDITagArray::~uniDoppelgangerBDITagArray() {
+    gm_free(tagArray);
+    gm_free(prevPointerArray);
+    gm_free(nextPointerArray);
+    gm_free(mapPointerArray);
+    gm_free(segmentPointerArray);
+    gm_free(approximateArray);
+}
+
+int32_t uniDoppelgangerBDITagArray::lookup(Address lineAddr, const MemReq* req, bool updateReplacement) {
+    uint32_t set = hf->hash(0, lineAddr) & setMask;
+    uint32_t first = set*assoc;
+    for (uint32_t id = first; id < first + assoc; id++) {
+        if (tagArray[id] ==  lineAddr) {
+            if (updateReplacement) rp->update(id, req);
+            return id;
+        }
+    }
+    return -1;
+}
+
+int32_t uniDoppelgangerBDITagArray::preinsert(Address lineAddr, const MemReq* req, Address* wbLineAddr) {
+    uint32_t set = hf->hash(0, lineAddr) & setMask;
+    uint32_t first = set*assoc;
+
+    uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc));
+
+    *wbLineAddr = tagArray[candidate];
+    return candidate;
+}
+
+bool uniDoppelgangerBDITagArray::evictAssociatedData(int32_t lineId, int32_t* newLLHead, bool* approximate) {
+    *newLLHead = -1;
+    if (mapPointerArray[lineId] == -1)
+        return false;
+    if (!approximateArray[lineId])
+        return true;
+    *approximate = true;
+    if (prevPointerArray[lineId] != -1)
+        return false;
+    else
+        *newLLHead = nextPointerArray[lineId];
+    if (nextPointerArray[lineId] != -1)
+        return false;
+    return true;
+}
+
+void uniDoppelgangerBDITagArray::postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t mapId, int32_t segmentId, int32_t listHead, bool approximate, bool updateReplacement) {
+    if (!tagArray[tagId] && lineAddr) {
+        validLines++;
+    } else if (tagArray[tagId] && !lineAddr) {
+        assert(validLines);
+        validLines--;
+    }
+    rp->replaced(tagId);
+    tagArray[tagId] = lineAddr;
+    mapPointerArray[tagId] = mapId;
+    segmentPointerArray[tagId] = segmentId;
+    approximateArray[tagId] = approximate;
+    if (prevPointerArray[tagId] != -1)
+        nextPointerArray[prevPointerArray[tagId]] = nextPointerArray[tagId];
+    if (nextPointerArray[tagId] != -1)
+        prevPointerArray[nextPointerArray[tagId]] = prevPointerArray[tagId];
+    prevPointerArray[tagId] = -1;
+    nextPointerArray[tagId] = listHead;
+    if (listHead >= 0) {
+        if(prevPointerArray[listHead] == -1) prevPointerArray[listHead] = tagId;
+        else panic("List head is not actually a list head!");
+    }
+    if(updateReplacement) rp->update(tagId, req);
+}
+
+void uniDoppelgangerBDITagArray::changeInPlace(Address lineAddr, const MemReq* req, int32_t tagId, int32_t mapId, int32_t segmentId, int32_t listHead, bool approximate, bool updateReplacement) {
+    // if (!tagArray[tagId] && lineAddr) {
+    //     validLines++;
+    // } else if (tagArray[tagId] && !lineAddr) {
+    //     validLines--;
+    // }
+    // rp->replaced(tagId);
+    tagArray[tagId] = lineAddr;
+    mapPointerArray[tagId] = mapId;
+    segmentPointerArray[tagId] = segmentId;
+    approximateArray[tagId] = approximate;
+    if (prevPointerArray[tagId] != -1)
+        nextPointerArray[prevPointerArray[tagId]] = nextPointerArray[tagId];
+    if (nextPointerArray[tagId] != -1)
+        prevPointerArray[nextPointerArray[tagId]] = prevPointerArray[tagId];
+    prevPointerArray[tagId] = -1;
+    nextPointerArray[tagId] = listHead;
+    if (listHead >= 0) {
+        if(prevPointerArray[listHead] == -1) prevPointerArray[listHead] = tagId;
+        else panic("List head is not actually a list head!");
+    }
+    if(updateReplacement) rp->update(tagId, req);
+}
+
+int32_t uniDoppelgangerBDITagArray::readMapId(const int32_t tagId) {
+    // assert_msg(approximate[tagId], "must be approximate to read mapId");
+    return mapPointerArray[tagId];
+}
+
+int32_t uniDoppelgangerBDITagArray::readSegmentId(const int32_t tagId) {
+    // assert_msg(approximate[tagId], "must be approximate to read mapId");
+    return segmentPointerArray[tagId];
+}
+
+int32_t uniDoppelgangerBDITagArray::readDataId(const int32_t tagId) {
+    // assert_msg(!approximate[tagId], "must be exact to read dataId");
+    return mapPointerArray[tagId];
+}
+
+Address uniDoppelgangerBDITagArray::readAddress(int32_t tagId) {
+    return tagArray[tagId];
+}
+
+int32_t uniDoppelgangerBDITagArray::readNextLL(int32_t tagId) {
+    return nextPointerArray[tagId];
+}
+
+uint32_t uniDoppelgangerBDITagArray::getValidLines() {
+    return validLines;
+}
+
+uint32_t uniDoppelgangerBDITagArray::countValidLines() {
+    uint32_t Counter = 0;
+    for (uint32_t i = 0; i < numLines; i++) {
+        if (mapPointerArray[i] != -1)
+            Counter++;
+    }
+    return Counter;
+}
+
+void uniDoppelgangerBDITagArray::print() {
+    for (uint32_t i = 0; i < this->numLines; i++) {
+        if (mapPointerArray[i] != -1)
+            info("%i: %lu, %i, %i, %i, %s", i, tagArray[i] << lineBits, prevPointerArray[i], nextPointerArray[i], mapPointerArray[i], approximateArray[i]? "approximate":"exact");
+    }
+}
+
+uniDoppelgangerBDIDataArray::uniDoppelgangerBDIDataArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf, uint32_t _tagRatio) : rp(_rp), hf(_hf), numLines(_numLines), assoc(_assoc), tagRatio(_tagRatio) {
+    numSets = numLines/assoc;
+    tagCounterArray = gm_calloc<int32_t*>(numSets);
+    tagPointerArray = gm_malloc<int32_t*>(numSets);
+    mtagArray = gm_malloc<int32_t*>(numSets);
+    approximateArray = gm_calloc<bool*>(numLines);
+    compressionEncodingArray = gm_malloc<BDICompressionEncoding*>(numLines);
+    info("%i, %i", numSets, assoc);
+    for (uint32_t i = 0; i < numSets; i++) {
+        tagCounterArray[i] = gm_calloc<int32_t>(assoc);
+        tagPointerArray[i] = gm_malloc<int32_t>(assoc);
+        compressionEncodingArray[i] = gm_malloc<BDICompressionEncoding>(assoc);
+        mtagArray[i] = gm_malloc<int32_t>(assoc);
+        approximateArray[i] = gm_calloc<bool>(assoc);
+        for (uint32_t j = 0; j < assoc; j++) {
+            tagPointerArray[i][j] = -1;
+            mtagArray[i][j] = -1;
+            compressionEncodingArray[i][j] = NONE;
+        }
+    }
+    setMask = numSets - 1;
+    validSegments = 0;
+    assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
+}
+
+uniDoppelgangerBDIDataArray::~uniDoppelgangerBDIDataArray() {
+    for (uint32_t i = 0; i < numSets; i++) {
+        gm_free(mtagArray[i]);
+        gm_free(tagCounterArray[i]);
+        gm_free(tagPointerArray[i]);
+        gm_free(approximateArray[i]);
+    }
+    gm_free(mtagArray);
+    gm_free(tagPointerArray);
+    gm_free(tagCounterArray);
+    gm_free(approximateArray);
+}
+
+int32_t uniDoppelgangerBDIDataArray::lookup(uint32_t map) {
+    uint32_t set = hf->hash(0, map) & setMask;
+    return set;
+}
+
+int32_t uniDoppelgangerBDIDataArray::lookup(uint32_t map, uint32_t set, const MemReq* req, bool updateReplacement) {
+    for (uint32_t id = 0; id < assoc; id++) {
+        if (mtagArray[set][id] == (int32_t)map && approximateArray[set][id] == true) {
+            if (updateReplacement) rp->update(set*assoc+id, req);
+            return id;
+        }
+    }
+    return -1;
+}
+
+uint32_t uniDoppelgangerBDIDataArray::calculateMap(const DataLine data, DataType type, DataValue minValue, DataValue maxValue) {
+    // Get hash and map values
+    int64_t intAvgHash = 0, intRangeHash = 0;
+    double floatAvgHash = 0, floatRangeHash = 0;
+    int64_t intMax = std::numeric_limits<int64_t>::min(),
+            intMin = std::numeric_limits<int64_t>::max(),
+            intSum = 0;
+    double floatMax = std::numeric_limits<double>::min(),
+            floatMin = std::numeric_limits<double>::max(),
+            floatSum = 0;
+    double mapStep = 0;
+    int32_t avgMap = 0, rangeMap = 0;
+    uint32_t map = 0;
+    switch (type)
+    {
+        case ZSIM_UINT8:
+            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(uint8_t); i++) {
+                intSum += ((uint8_t*) data)[i];
+                if (((uint8_t*) data)[i] > intMax)
+                    intMax = ((uint8_t*) data)[i];
+                if (((uint8_t*) data)[i] < intMin)
+                    intMin = ((uint8_t*) data)[i];
+            }
+            intAvgHash = intSum/(zinfo->lineSize/sizeof(uint8_t));
+            intRangeHash = intMax - intMin;
+            if (intMax > maxValue.UINT8)
+                panic("Received a value bigger than the annotation's Max!!");
+            if (intMin < minValue.UINT8)
+                panic("Received a value lower than the annotation's Min!!");
+            if (zinfo->mapSize > sizeof(uint8_t)) {
+                avgMap = intAvgHash;
+                rangeMap = intRangeHash;
+            } else {
+                mapStep = (maxValue.UINT8 - minValue.UINT8)/std::pow(2,zinfo->mapSize-1);
+                avgMap = intAvgHash/mapStep;
+                rangeMap = intRangeHash/mapStep;
+            }
+            break;
+        case ZSIM_INT8:
+            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(int8_t); i++) {
+                intSum += ((int8_t*) data)[i];
+                if (((int8_t*) data)[i] > intMax)
+                    intMax = ((int8_t*) data)[i];
+                if (((int8_t*) data)[i] < intMin)
+                    intMin = ((int8_t*) data)[i];
+            }
+            intAvgHash = intSum/(zinfo->lineSize/sizeof(int8_t));
+            intRangeHash = intMax - intMin;
+            if (intMax > maxValue.INT8)
+                panic("Received a value bigger than the annotation's Max!!");
+            if (intMin < minValue.INT8)
+                panic("Received a value lower than the annotation's Min!!");
+            if (zinfo->mapSize > sizeof(int8_t)) {
+                avgMap = intAvgHash;
+                rangeMap = intRangeHash;
+            } else {
+                mapStep = (maxValue.INT8 - minValue.INT8)/std::pow(2,zinfo->mapSize-1);
+                avgMap = intAvgHash/mapStep;
+                rangeMap = intRangeHash/mapStep;
+            }
+            break;
+        case ZSIM_UINT16:
+            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(uint16_t); i++) {
+                intSum += ((uint16_t*) data)[i];
+                if (((uint16_t*) data)[i] > intMax)
+                    intMax = ((uint16_t*) data)[i];
+                if (((uint16_t*) data)[i] < intMin)
+                    intMin = ((uint16_t*) data)[i];
+            }
+            intAvgHash = intSum/(zinfo->lineSize/sizeof(uint16_t));
+            intRangeHash = intMax - intMin;
+            if (intMax > maxValue.UINT16)
+                panic("Received a value bigger than the annotation's Max!!");
+            if (intMin < minValue.UINT16)
+                panic("Received a value lower than the annotation's Min!!");
+            if (zinfo->mapSize > sizeof(uint16_t)) {
+                avgMap = intAvgHash;
+                rangeMap = intRangeHash;
+            } else {
+                mapStep = (maxValue.UINT16 - minValue.UINT16)/std::pow(2,zinfo->mapSize-1);
+                avgMap = intAvgHash/mapStep;
+                rangeMap = intRangeHash/mapStep;
+            }
+            break;
+        case ZSIM_INT16:
+            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(int16_t); i++) {
+                intSum += ((int16_t*) data)[i];
+                if (((int16_t*) data)[i] > intMax)
+                    intMax = ((int16_t*) data)[i];
+                if (((int16_t*) data)[i] < intMin)
+                    intMin = ((int16_t*) data)[i];
+            }
+            intAvgHash = intSum/(zinfo->lineSize/sizeof(int16_t));
+            intRangeHash = intMax - intMin;
+            if (intMax > maxValue.INT16)
+                panic("Received a value bigger than the annotation's Max!!");
+            if (intMin < minValue.INT16)
+                panic("Received a value lower than the annotation's Min!!");
+            if (zinfo->mapSize > sizeof(int16_t)) {
+                avgMap = intAvgHash;
+                rangeMap = intRangeHash;
+            } else {
+                mapStep = (maxValue.INT16 - minValue.INT16)/std::pow(2,zinfo->mapSize-1);
+                avgMap = intAvgHash/mapStep;
+                rangeMap = intRangeHash/mapStep;
+            }
+            break;
+        case ZSIM_UINT32:
+            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(uint32_t); i++) {
+                intSum += ((uint32_t*) data)[i];
+                if (((uint32_t*) data)[i] > intMax)
+                    intMax = ((uint32_t*) data)[i];
+                if (((uint32_t*) data)[i] < intMin)
+                    intMin = ((uint32_t*) data)[i];
+            }
+            intAvgHash = intSum/(zinfo->lineSize/sizeof(uint32_t));
+            intRangeHash = intMax - intMin;
+            if (intMax > maxValue.UINT32)
+                panic("Received a value bigger than the annotation's Max!!");
+            if (intMin < minValue.UINT32)
+                panic("Received a value lower than the annotation's Min!!");
+            mapStep = (maxValue.UINT32 - minValue.UINT32)/std::pow(2,zinfo->mapSize-1);
+            avgMap = intAvgHash/mapStep;
+            rangeMap = intRangeHash/mapStep;
+            break;
+        case ZSIM_INT32:
+            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(int32_t); i++) {
+                intSum += ((int32_t*) data)[i];
+                if (((int32_t*) data)[i] > intMax)
+                    intMax = ((int32_t*) data)[i];
+                if (((int32_t*) data)[i] < intMin)
+                    intMin = ((int32_t*) data)[i];
+            }
+            intAvgHash = intSum/(zinfo->lineSize/sizeof(int32_t));
+            intRangeHash = intMax - intMin;
+            if (intMax > maxValue.INT32)
+                panic("Received a value bigger than the annotation's Max!!");
+            if (intMin < minValue.INT32)
+                panic("Received a value lower than the annotation's Min!!");
+            mapStep = (maxValue.INT32 - minValue.INT32)/std::pow(2,zinfo->mapSize-1);
+            avgMap = intAvgHash/mapStep;
+            rangeMap = intRangeHash/mapStep;
+            break;
+        case ZSIM_UINT64:
+            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(uint64_t); i++) {
+                intSum += ((uint64_t*) data)[i];
+                if ((int64_t)(((uint64_t*) data)[i]) > intMax)
+                    intMax = ((uint64_t*) data)[i];
+                if ((int64_t)(((uint64_t*) data)[i]) < intMin)
+                    intMin = ((uint64_t*) data)[i];
+            }
+            intAvgHash = intSum/(zinfo->lineSize/sizeof(uint64_t));
+            intRangeHash = intMax - intMin;
+            if (intMax > (int64_t)maxValue.UINT64)
+                panic("Received a value bigger than the annotation's Max!!");
+            if (intMin < (int64_t)minValue.UINT64)
+                panic("Received a value lower than the annotation's Min!!");
+            mapStep = (maxValue.UINT64 - minValue.UINT64)/std::pow(2,zinfo->mapSize-1);
+            avgMap = intAvgHash/mapStep;
+            rangeMap = intRangeHash/mapStep;
+            break;
+        case ZSIM_INT64:
+            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(int64_t); i++) {
+                intSum += ((int64_t*) data)[i];
+                if (((int64_t*) data)[i] > intMax)
+                    intMax = ((int64_t*) data)[i];
+                if (((int64_t*) data)[i] < intMin)
+                    intMin = ((int64_t*) data)[i];
+            }
+            intAvgHash = intSum/(zinfo->lineSize/sizeof(int64_t));
+            intRangeHash = intMax - intMin;
+            if (intMax > maxValue.INT64)
+                panic("Received a value bigger than the annotation's Max!!");
+            if (intMin < minValue.INT64)
+                panic("Received a value lower than the annotation's Min!!");
+            mapStep = (maxValue.INT64 - minValue.INT64)/std::pow(2,zinfo->mapSize-1);
+            avgMap = intAvgHash/mapStep;
+            rangeMap = intRangeHash/mapStep;
+            break;
+        case ZSIM_FLOAT:
+            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(float); i++) {
+                floatSum += ((float*) data)[i];
+                if (((float*) data)[i] > floatMax)
+                    floatMax = ((float*) data)[i];
+                if (((float*) data)[i] < floatMin)
+                    floatMin = ((float*) data)[i];
+            }
+            floatAvgHash = floatSum/(zinfo->lineSize/sizeof(float));
+            floatRangeHash = floatMax - floatMin;
+            // if (floatMax > maxValue.FLOAT)
+                // warn("Received a value bigger than the annotation's Max!! %.10f, %.10f", floatMax, maxValue.FLOAT);
+            // if (floatMin < minValue.FLOAT)
+                // warn("Received a value lower than the annotation's Min!! %.10f, %.10f", floatMin, minValue.FLOAT);
+            mapStep = (maxValue.FLOAT - minValue.FLOAT)/std::pow(2,zinfo->mapSize-1);
+            avgMap = floatAvgHash/mapStep;
+            rangeMap = floatRangeHash/mapStep;
+            break;
+        case ZSIM_DOUBLE:
+            for (uint32_t i = 0; i < zinfo->lineSize/sizeof(double); i++) {
+                floatSum += ((double*) data)[i];
+                if (((double*) data)[i] > floatMax)
+                    floatMax = ((double*) data)[i];
+                if (((double*) data)[i] < floatMin)
+                    floatMin = ((double*) data)[i];
+            }
+            floatAvgHash = floatSum/(zinfo->lineSize/sizeof(double));
+            floatRangeHash = floatMax - floatMin;
+            // if (floatMax > maxValue.DOUBLE)
+                // warn("Received a value bigger than the annotation's Max!! %.10f, %.10f", floatMax, maxValue.DOUBLE);
+            // if (floatMin < minValue.DOUBLE)
+                // warn("Received a value lower than the annotation's Min!! %.10f, %.10f", floatMin, minValue.DOUBLE);
+            mapStep = (maxValue.DOUBLE - minValue.DOUBLE)/std::pow(2,zinfo->mapSize-1);
+            avgMap = floatAvgHash/mapStep;
+            rangeMap = floatRangeHash/mapStep;
+            break;
+        default:
+            panic("Wrong Data Type!!");
+    }
+    map = ((uint32_t)avgMap << (32 - zinfo->mapSize)) >> (32 - zinfo->mapSize);
+    rangeMap = ((uint32_t)rangeMap << (32 - zinfo->mapSize/2)) >> (32 - zinfo->mapSize/2);
+    rangeMap = (rangeMap << zinfo->mapSize);
+    map |= rangeMap;
+    return map;
+}
+
+int32_t uniDoppelgangerBDIDataArray::preinsert(uint32_t map) {
+    uint32_t set = hf->hash(0, map) & setMask;
+    return set;
+}
+
+int32_t uniDoppelgangerBDIDataArray::preinsert(uint32_t set, const MemReq* req, int32_t* tagId, g_vector<uint32_t>& exceptions) {
+    uint32_t first = set*assoc;
+
+    uint32_t mapId = rp->rank(req, SetAssocCands(first, first+assoc), exceptions);
+
+    *tagId = tagPointerArray[set][mapId%assoc];
+    return mapId%assoc;
+}
+
+void uniDoppelgangerBDIDataArray::postinsert(int32_t map, const MemReq* req, int32_t mapId, int32_t segmentId, int32_t tagId, int32_t counter, BDICompressionEncoding compression, bool approximate, bool updateReplacement) {
+    if (tagPointerArray[mapId][segmentId] == -1 && tagId != -1) {
+        validSegments+=BDICompressionToSize(compression, zinfo->lineSize)/8;
+            // info("UP");
+        // validLines++;
+    } else if (tagPointerArray[mapId][segmentId] != -1 && tagId == -1) {
+        validSegments-=BDICompressionToSize(compressionEncodingArray[mapId][segmentId], zinfo->lineSize)/8;
+        assert(validSegments);
+    } else if (tagPointerArray[mapId][segmentId] != -1 && tagId != -1) {
+        validSegments+=BDICompressionToSize(compression, zinfo->lineSize)/8;
+        validSegments-=BDICompressionToSize(compressionEncodingArray[mapId][segmentId], zinfo->lineSize)/8;
+    }
+    rp->replaced(mapId*assoc+segmentId);
+    mtagArray[mapId][segmentId] = map;
+    tagPointerArray[mapId][segmentId] = tagId;
+    tagCounterArray[mapId][segmentId] = counter;
+    compressionEncodingArray[mapId][segmentId] = compression;
+    approximateArray[mapId][segmentId] = approximate;
+    if(updateReplacement) rp->update(mapId*assoc+segmentId, req);
+}
+
+void uniDoppelgangerBDIDataArray::changeInPlace(int32_t map, const MemReq* req, int32_t mapId, int32_t segmentId, int32_t tagId, int32_t counter, BDICompressionEncoding compression, bool approximate, bool updateReplacement) {
+    validSegments-=BDICompressionToSize(compressionEncodingArray[mapId][segmentId], zinfo->lineSize)/8;
+    validSegments+=BDICompressionToSize(compression, zinfo->lineSize)/8;
+    mtagArray[mapId][segmentId] = map;
+    tagPointerArray[mapId][segmentId] = tagId;
+    tagCounterArray[mapId][segmentId] = counter;
+    compressionEncodingArray[mapId][segmentId] = compression;
+    approximateArray[mapId][segmentId] = approximate;
+    if(updateReplacement) rp->update(mapId*assoc+segmentId, req);
+}
+
+int32_t uniDoppelgangerBDIDataArray::readListHead(int32_t mapId, int32_t segmentId) {
+    return tagPointerArray[mapId][segmentId];
+}
+
+int32_t uniDoppelgangerBDIDataArray::readCounter(int32_t mapId, int32_t segmentId) {
+    return tagCounterArray[mapId][segmentId];
+}
+
+bool uniDoppelgangerBDIDataArray::readApproximate(int32_t mapId, int32_t segmentId) {
+    return approximateArray[mapId][segmentId];
+}
+
+BDICompressionEncoding uniDoppelgangerBDIDataArray::readCompressionEncoding(int32_t mapId, int32_t segmentId) {
+    return compressionEncodingArray[mapId][segmentId];
+}
+
+int32_t uniDoppelgangerBDIDataArray::readMap(int32_t mapId, int32_t segmentId) {
+    return mtagArray[mapId][segmentId];
+}
+
+void uniDoppelgangerBDIDataArray::print() {
+    for (uint32_t i = 0; i < this->numSets; i++) {
+        for (uint32_t j = 0; j < assoc; j++) {
+            if (tagPointerArray[i][j] != -1)
+                info("%i, %i: %i, %i, %i, %s, %s", i,j, mtagArray[i][j], tagPointerArray[i][j], tagCounterArray[i][j], BDICompressionName(compressionEncodingArray[i][j]), approximateArray[i][j]? "approximate":"exact");
+        }
+    }
+}
+
+uint32_t uniDoppelgangerBDIDataArray::getValidSegments() {
+    return validSegments;
+}
+
+// uint32_t uniDoppelgangerBDIDataArray::countValidLines() {
+//     uint32_t Counter = 0;
+//     for (uint32_t i = 0; i < numSets; i++) {
+//         for (uint32_t j = 0; j < assoc; j++) {
+//             if (tagPointerArray[i][j] != -1)
+//                 Counter++;
+//         }
+//     }
+//     return Counter;
+// }
+// Doppelganger BDI End
+
+// GDISH Begin
+GDishTagArray::GDishTagArray(uint32_t _numLines, uint32_t _assoc, uint32_t _dataAssoc, uint32_t _numDictEntries, ReplPolicy* _rp, HashFamily* _hf) : 
+rp(_rp), hf(_hf), numLines(_numLines), assoc(_assoc), dataAssoc(_dataAssoc), numDictEntries(_numDictEntries) {
+    tagArray = gm_calloc<Address>(numLines);
+    timestampArray = gm_calloc<uint64_t>(numLines);
+    segmentPointerArray = gm_malloc<int32_t>(numLines);
+    approximateArray = gm_calloc<bool>(numLines);
+    compressionArray = gm_malloc<GDISHCompressionType>(numLines);
+    dataArray = gm_malloc<g_vector<uint32_t>>(numLines);
+    for (uint32_t i = 0; i < numLines; i++) {
+        segmentPointerArray[i] = -1;
+        compressionArray[i] = NONE;
+    }
+    numSets = numLines/assoc;
+    setMask = numSets - 1;
+    validLines = 0;
+    dataValidSegments = 0;
+    assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
+}
+
+GDishTagArray::~GDishTagArray() {
+    gm_free(tagArray);
+    gm_free(segmentPointerArray);
+    gm_free(compressionArray);
+    gm_free(approximateArray);
+    gm_free(timestampArray);
+}
+
+int32_t GDishTagArray::lookup(Address lineAddr, const MemReq* req, bool updateReplacement) {
+    uint32_t set = hf->hash(0, lineAddr) & setMask;
+    uint32_t first = set*assoc;
+    for (uint32_t id = first; id < first + assoc; id++) {
+        if (tagArray[id] ==  lineAddr) {
+            if (updateReplacement) rp->update(id, req);
+            return id;
+        }
+    }
+    return -1;
+}
+
+int32_t GDishTagArray::preinsert(Address lineAddr, const MemReq* req, Address* wbLineAddr) {
+    uint32_t set = hf->hash(0, lineAddr) & setMask;
+    uint32_t first = set*assoc;
+
+    uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc));
+
+    *wbLineAddr = tagArray[candidate];
+    return candidate;
+}
+
+int32_t GDishTagArray::needEviction(Address lineAddr, const MemReq* req, uint16_t size, g_vector<uint32_t>& alreadyEvicted, Address* wbLineAddr) {
+    uint32_t set = hf->hash(0, lineAddr) & setMask;
+    uint32_t first = set*assoc;
+    uint16_t occupiedSpace = 0;
+    for (uint32_t id = first; id < first + assoc; id++) {
+        bool found = false;
+        for (uint32_t i = 0; i < alreadyEvicted.size(); i++) {
+            if (alreadyEvicted[i] == id) {found = true; break;}
+        }
+        if (segmentPointerArray[id] != -1 && !found) {
+            occupiedSpace += compressionArray[id] == NONE? zinfo->lineSize: compressionArray[id] == SCHEME1? (zinfo->lineSize()/4)*((uint32_t)(32/log2(numDictEntries))): compressionArray[id] == SCHEME2? (zinfo->lineSize()/4)*((uint32_t)(32/(log2(numDictEntries)+4))):0;
+        }
+    }
+    if (dataAssoc*zinfo->lineSize - occupiedSpace >= size)
+        return -1;
+    else {
+        uint32_t candidate = rp->rank(req, SetAssocCands(first, first+assoc), alreadyEvicted);
+        *wbLineAddr = tagArray[candidate];
+        return candidate;
+    }
+}
+
+void GDishTagArray::postinsert(const Address lineAddr, const MemReq* req, uint32_t tagId, uint64_t timestamp, GDISHCompressionType compression, uint8_t segmentId, g_vector<uint32_t>& dicts, bool approximate) {
+    if (!tagArray[tagId] && lineAddr) {
+        validLines++;
+        dataValidSegments+= compression == NONE? zinfo->lineSize: compression == SCHEME1? (zinfo->lineSize()/4)*((uint32_t)(32/log2(numDictEntries))): compression == SCHEME2? (zinfo->lineSize()/4)*((uint32_t)(32/(log2(numDictEntries)+4))):0;
+    } else if (tagArray[tagId] && !lineAddr) {
+        validLines--;
+        dataValidSegments-= compressionArray[id] == NONE? zinfo->lineSize: compressionArray[id] == SCHEME1? (zinfo->lineSize()/4)*((uint32_t)(32/log2(numDictEntries))): compressionArray[id] == SCHEME2? (zinfo->lineSize()/4)*((uint32_t)(32/(log2(numDictEntries)+4))):0;
+        assert(validLines);
+        assert(dataValidSegments);
+    } else {
+        dataValidSegments-= compressionArray[id] == NONE? zinfo->lineSize: compressionArray[id] == SCHEME1? (zinfo->lineSize()/4)*((uint32_t)(32/log2(numDictEntries))): compressionArray[id] == SCHEME2? (zinfo->lineSize()/4)*((uint32_t)(32/(log2(numDictEntries)+4))):0;
+        dataValidSegments+= compression == NONE? zinfo->lineSize: compression == SCHEME1? (zinfo->lineSize()/4)*((uint32_t)(32/log2(numDictEntries))): compression == SCHEME2? (zinfo->lineSize()/4)*((uint32_t)(32/(log2(numDictEntries)+4))):0;
+    }
+    rp->replaced(tagId);
+    tagArray[tagId] = lineAddr;
+    segmentPointerArray[tagId] = segmentId;
+    compressionArray[tagId] = compression;
+    approximateArray[tagId] = approximate;
+    timestampArray[tagId] = timestamp;
+    dataArray[tagId] = dicts;
+    if(updateReplacement) rp->update(tagId, req);
+}
+
+GDISHCompressionType GDishTagArray::readCompressionType(int32_t tagId) {
+    return compressionArray[tagId];
+}
+
+int8_t GDishTagArray::readSegmentPointer(int32_t tagId) {
+    return segmentPointerArray[tagId];
+}
+
+uint64_t GDishTagArray::readTimestamp(int32_t tagId) {
+    return timestampArray[tagId];
+}
+
+bool GDishTagArray::readApproximate(int32_t tagId) {
+    return approximateArray[tagId];
+}
+
+g_vector<uint32_t> GDishTagArray::readDictIndices(int32_t tagId) {
+    return dataArray[tagId];
+}
+
+uint32_t GDishTagArray::getValidLines() {
+    return validLines;
+}
+
+uint32_t GDishTagArray::countValidLines() {
+    uint32_t Counter = 0;
+    for (uint32_t i = 0; i < numLines; i++) {
+        if (segmentPointerArray[i] != -1)
+            Counter++;
+    }
+    return Counter;
+}
+
+uint32_t GDishTagArray::getDataValidSegments() {
+    return dataValidSegments;
+}
+
+uint32_t GDishTagArray::countDataValidSegments() {
+    uint32_t Counter = 0;
+    for (uint32_t i = 0; i < numLines; i++) {
+        if (segmentPointerArray[i] != -1)
+            Counter+=compressionArray[id] == NONE? zinfo->lineSize: compressionArray[id] == SCHEME1? (zinfo->lineSize()/4)*((uint32_t)(32/log2(numDictEntries))): compressionArray[id] == SCHEME2? (zinfo->lineSize()/4)*((uint32_t)(32/(log2(numDictEntries)+4))):0;
+    }
+    return Counter;
+}
+
+void GDishTagArray::print() {
+    for (uint32_t i = 0; i < this->numLines; i++) {
+        if (segmentPointerArray[i] != -1)
+            info("%i: %lu, %i, %s", i, tagArray[i] << lineBits, compressionArray[id] == NONE? zinfo->lineSize: compressionArray[id] == SCHEME1? (zinfo->lineSize()/4)*((uint32_t)(32/log2(numDictEntries))): compressionArray[id] == SCHEME2? (zinfo->lineSize()/4)*((uint32_t)(32/(log2(numDictEntries)+4))):0, approximateArray[i]? "approximate":"exact");
+    }
+}
+
+void GDishDataArray::approximate(const DataLine data, DataType type) {
+    if (type == ZSIM_FLOAT) {
+        for (uint16_t i = 0; i < zinfo->lineSize/4; i++) {
+            ((uint32_t*) data)[i] = ((uint32_t*) data)[i] >> zinfo->floatCutSize;
+            // ((uint32_t*) data)[i] = ((uint32_t*) data)[i] << zinfo->floatCutSize;
+        }
+    } else if (type == ZSIM_DOUBLE) {
+        for (uint16_t i = 0; i < zinfo->lineSize/8; i++) {
+            ((uint64_t*) data)[i] = ((uint64_t*) data)[i] >> zinfo->doubleCutSize;
+            // ((uint64_t*) data)[i] = ((uint64_t*) data)[i] << zinfo->doubleCutSize;
+        }
+    } else {
+        panic("We only approximate floats and doubles");
+    }
+}
+
+void GDishDataArray::compress(const DataLine data, g_vector<uint32_t>& DISH1, g_vector<uint32_t>& DISH2) {
+    for (uint32_t i = 0; i < zinfo->lineSize/4; i++) {
+        if (std::find(DISH1.begin(), DISH1.end(), ((uint32_t*) data)[i]) == DISH1.end()) {
+            DISH1.push_back(((uint32_t*) data)[i]);
+        }
+        if (std::find(DISH2.begin(), DISH2.end(), (((((uint32_t*) data)[i]) >> 4) << 4))) == DISH2.end()) {
+            DISH2.push_back((((((uint32_t*) data)[i]) >> 4) << 4));
+        }
+    }
+}
+
+GDishDedupArray::GDishDedupArray(uint32_t _numLines) : numLines(_numLines) {
+    tagCounterArray = gm_calloc<int32_t>(numLines);
+    timestampArray = gm_calloc<uint64_t>(numLines);
+    dataArray = gm_malloc<DataLine>(numLines);
+    for (uint32_t i = 0; i < numLines; i++) {
+        dataArray[i] = gm_calloc<uint8_t>(zinfo->lineSize);
+    }
+    assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
+}
+
+int32_t GDishDedupArray::exists(DataLine data) {
+    for (uint32_t i = 0; i < numLines; i++) {
+        if (std::memcmp(data, dataArray[i], zinfo->lineSize) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int32_t GDishDedupArray::preinsert(int32_t* count) {
+    *count = 999999999;
+    uint32_t least = 0;
+    for (uint32_t i = 0; i < numLines; i++) {
+        if (tagCounterArray[i] < *count) {
+            least = i;
+            *count = tagCounterArray[i];
+        } else if (tagCounterArray[i] == *count) {
+            if (timestampArray[i] < timestampArray[least]) {
+                least = i;
+                *count = tagCounterArray[i];
+            }
+        }
+    }
+    return least;
+}
+
+void GDishDedupArray::postinsert(int32_t id, DataLine data, uint64_t timestamp) {
+    tagCounterArray[id] = 0;
+    PIN_SafeCopy(dataArray[id], data, zinfo->lineSize);
+    timestampArray[id] = timestamp;
+}
+
+void GDishDedupArray::increaseCounter(int32_t id) {
+    tagCounterArray[id]++;
+}
+
+void GDishDedupArray::decreaseCounter(int32_t id) {
+    tagCounterArray[id]--;
+    if (tagCounterArray[id] == 0) {
+        timestampArray[id] = 0;s
+    }
+}
+
+int64_t GDishDedupArray::readTimestamp(int32_t id) {
+    return timestampArray[id];
+}
+// GDISH End
+
 /* ZCache implementation */
 
 ZArray::ZArray(uint32_t _numLines, uint32_t _ways, uint32_t _candidates, ReplPolicy* _rp, HashFamily* _hf) //(int _size, int _lineSize, int _assoc, int _zassoc, ReplacementPolicy<T>* _rp, int _hashType)

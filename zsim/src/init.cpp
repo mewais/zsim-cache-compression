@@ -42,6 +42,7 @@
 #include "ddr_mem.h"
 #include "debug_zsim.h"
 #include "unidoppelganger_cache.h"
+#include "unidoppelgangerbdi_cache.h"
 #include "approximatebdi_cache.h"
 #include "approximatededup_cache.h"
 #include "approximatededupbdi_cache.h"
@@ -112,7 +113,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
     uint32_t candidates = (arrayType == "Z")? config.get<uint32_t>(prefix + "array.candidates", 16) : ways;
 
     //Need to know number of hash functions before instantiating array
-    if (arrayType == "SetAssoc" || arrayType == "uniDoppelganger" || arrayType == "ApproximateBDI" || arrayType == "ApproximateDedup" || arrayType == "ApproximateDedupBDI") {
+    if (arrayType == "SetAssoc" || arrayType == "uniDoppelganger" || arrayType == "uniDoppelgangerBDI" || arrayType == "ApproximateBDI" || arrayType == "ApproximateDedup" || arrayType == "ApproximateDedupBDI") {
         numHashes = 1;
     } else if (arrayType == "Z") {
         numHashes = ways;
@@ -241,6 +242,8 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
     CacheArray* array = nullptr;
     uniDoppelgangerTagArray* utagArray = nullptr;
     uniDoppelgangerDataArray* udataArray = nullptr;
+    uniDoppelgangerBDITagArray* ubtagArray = nullptr;
+    uniDoppelgangerBDIDataArray* ubdataArray = nullptr;
     ApproximateBDITagArray* atagArray = nullptr;
     ApproximateBDIDataArray* adataArray = nullptr;
     ApproximateDedupTagArray* dtagArray = nullptr;
@@ -288,6 +291,11 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
         size_t seed = _Fnv_hash_bytes(prefix.c_str(), prefix.size()+1, 0xB4AC5B);
         H3HashFamily* hashCompression = new H3HashFamily(1, setBits /*hashSetBits*/, 0xCAC7EAFFA1 + seed /*make randSeed depend on prefix*/);
         dbhashArray = new ApproximateDedupBDIHashArray(hashLines, hashAssoc, hashRP, hf, hashCompression);
+    } else if (arrayType == "uniDoppelgangerBDI") {
+        tagRP = new LRUReplPolicy<true>(numLines*tagRatio);
+        dataRP = new DataLRUReplPolicy(numLines*tagRatio);
+        ubtagArray = new uniDoppelgangerBDITagArray(numLines*tagRatio, ways, tagRP, hf);
+        ubdataArray = new uniDoppelgangerBDIDataArray(numLines*tagRatio, ways, dataRP, hf, tagRatio);
     } else if (arrayType == "SetAssoc") {
         array = new SetAssocArray(numLines, ways, rp, hf);
     } else if (arrayType == "Z") {
@@ -341,7 +349,26 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
             tagRP->setCC(cc);
             
-            cache = new uniDoppelgangerCache(numLines*tagRatio, numLines, cc, utagArray, udataArray, tagRP, dataRP,
+            cache = new uniDoppelgangerCache(numLines*tagRatio, numLines*tagRatio, cc, utagArray, udataArray, tagRP, dataRP,
+                accLat, invLat, mshrs, ways, timingCandidates, domain, name, crStats, evStats, tutStats, dutStats);
+            zinfo->compressionRatioStats->push_back(crStats);
+            zinfo->evictionStats->push_back(evStats);
+            zinfo->tagUtilizationStats->push_back(tutStats);
+            zinfo->dataUtilizationStats->push_back(dutStats);
+        } else if (type == "uniDoppelgangerBDI") {
+            g_string statName = name + g_string(" CompressionRatio");
+            RunningStats* crStats = new RunningStats(statName);
+            statName = name + g_string(" EvictionsPerAccess");
+            RunningStats* evStats = new RunningStats(statName);
+            statName = name + g_string(" TagArrayUtilization");
+            RunningStats* tutStats = new RunningStats(statName);
+            statName = name + g_string(" DataArrayUtilization");
+            RunningStats* dutStats = new RunningStats(statName);
+            uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
+            uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
+            tagRP->setCC(cc);
+            
+            cache = new uniDoppelgangerBDICache(numLines*tagRatio, numLines, cc, ubtagArray, ubdataArray, tagRP, dataRP,
                 accLat, invLat, mshrs, ways, timingCandidates, domain, name, crStats, evStats, tutStats, dutStats);
             zinfo->compressionRatioStats->push_back(crStats);
             zinfo->evictionStats->push_back(evStats);
