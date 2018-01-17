@@ -82,6 +82,7 @@ static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, D
     // printf("[" HOOKS_STR "] Approximate Allocation1\n");
     DataValue* minValue = (DataValue*) malloc(sizeof(DataValue));
     DataValue* maxValue = (DataValue*) malloc(sizeof(DataValue));
+    // milc
     if (Type == HOOKS_DOUBLE)
     {
         minValue->HOOKS_DOUBLE = -4.1588886540090808;
@@ -91,6 +92,61 @@ static inline void zsim_allocate_approximate(void* Start, uint64_t ByteLength, D
     {
         minValue->HOOKS_FLOAT = -4.1588886540090808;
 	    maxValue->HOOKS_FLOAT = 5.0871395561061092;
+    }
+    // gromacs
+    if (Type == HOOKS_DOUBLE)
+    {
+        minValue->HOOKS_DOUBLE = -6.9526329538056441e-05;
+        maxValue->HOOKS_DOUBLE = 4.0843751882354336e+19;
+    }
+    else
+    {
+        minValue->HOOKS_FLOAT = -6.9526329538056441e-05;
+        maxValue->HOOKS_FLOAT = 4.0843751882354336e+19;
+    }
+    // namd
+    if (Type == HOOKS_DOUBLE)
+    {
+        minValue->HOOKS_DOUBLE = -99999;
+        maxValue->HOOKS_DOUBLE = 1850;
+    }
+    else
+    {
+        minValue->HOOKS_FLOAT = -71.6800003;
+        maxValue->HOOKS_FLOAT = 89128.9609;
+    }
+    // soplex
+    if (Type == HOOKS_DOUBLE)
+    {
+        minValue->HOOKS_DOUBLE = -25.01;
+        maxValue->HOOKS_DOUBLE = 25.01;
+    }
+    else
+    {
+        minValue->HOOKS_FLOAT = 89128.9609;
+        maxValue->HOOKS_FLOAT = -71.6800003;
+    }
+    // calculix
+    if (Type == HOOKS_DOUBLE)
+    {
+        minValue->HOOKS_DOUBLE = -180000000;
+        maxValue->HOOKS_DOUBLE = 1.0000001e+100;
+    }
+    else
+    {
+        minValue->HOOKS_FLOAT = -180000000;
+        maxValue->HOOKS_FLOAT = 1.0000001e+100;
+    }
+    // lbm
+    if (Type == HOOKS_DOUBLE)
+    {
+        minValue->HOOKS_DOUBLE = 0;
+        maxValue->HOOKS_DOUBLE = 1311114;
+    }
+    else
+    {
+        minValue->HOOKS_FLOAT = 0;
+        maxValue->HOOKS_FLOAT = 1311114;
     }
     // __asm__ __volatile__
     // (

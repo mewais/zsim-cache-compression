@@ -14,7 +14,7 @@ void zsim_heartbeat_() {
 }
 
 void zsim_mallocs_init_() {
-    // zsim_mallocs_init();
+    zsim_mallocs_init();
 }
 
 void zsim_allocate_approximate_(void* Start, uint64_t ByteLength, DataType Type) {

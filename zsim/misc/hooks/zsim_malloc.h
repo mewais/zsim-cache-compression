@@ -31,7 +31,7 @@ static inline void* malloc_zsim(size_t size, DataType Type)
     else
     {
         minValue->HOOKS_FLOAT = -4.1588886540090808;
-	    maxValue->HOOKS_FLOAT = 5.0871395561061092;
+        maxValue->HOOKS_FLOAT = 5.0871395561061092;
     }
     zsim_elaborate_allocate_approximate(Tmp, size, Type, minValue, maxValue);
     return Tmp;
@@ -52,7 +52,7 @@ static inline void* realloc_zsim(void *ptr, size_t size, DataType Type)
     else
     {
         minValue->HOOKS_FLOAT = -4.1588886540090808;
-	    maxValue->HOOKS_FLOAT = 5.0871395561061092;
+        maxValue->HOOKS_FLOAT = 5.0871395561061092;
     }
     zsim_elaborate_allocate_approximate(Tmp, size, Type, minValue, maxValue);
     return Tmp;
@@ -72,7 +72,7 @@ static inline void* calloc_zsim(size_t size1, size_t size2, DataType Type)
     else
     {
         minValue->HOOKS_FLOAT = -4.1588886540090808;
-	    maxValue->HOOKS_FLOAT = 5.0871395561061092;
+        maxValue->HOOKS_FLOAT = 5.0871395561061092;
     }
     zsim_elaborate_allocate_approximate(Tmp, size1*size2, Type, minValue, maxValue);
     return Tmp;
@@ -89,8 +89,18 @@ static void zsim_mallocs_init(/*DataType Type, DataValue* Min, DataValue* Max*/)
     printf("ZSIM Malloc Hooks Active\n");
     GlobalMin = (DataValue*) malloc(sizeof(DataValue));
     GlobalMax = (DataValue*) malloc(sizeof(DataValue));
-    GlobalMin->HOOKS_DOUBLE = -4.1588886540090808;
-    GlobalMax->HOOKS_DOUBLE = 5.0871395561061092;
+    // Bwaves
+    GlobalMin->HOOKS_DOUBLE = -2000;
+    GlobalMax->HOOKS_DOUBLE = 2000;
+    // Leslie3d
+    GlobalMin->HOOKS_DOUBLE = -450;
+    GlobalMax->HOOKS_DOUBLE = 2800;
+    // GemsFDTD
+    GlobalMin->HOOKS_DOUBLE = -350;
+    GlobalMax->HOOKS_DOUBLE = 98139295973;
+    // Tonto
+    GlobalMin->HOOKS_DOUBLE = -6.2662073581423241e+301;
+    GlobalMax->HOOKS_DOUBLE = 5.9323589279593982e+276;
     GlobalType = HOOKS_DOUBLE;
     OldMallocHook = __malloc_hook;
     OldReallocHook = __realloc_hook;
@@ -106,11 +116,9 @@ static void *zsim_malloc_hook (size_t size, const void *caller)
     __malloc_hook = OldMallocHook;
     __realloc_hook = OldReallocHook;
     __free_hook = OldFreeHook;
-    printf("Before\n");
+    printf(" \b");
     Tmp = malloc (size);
-    printf("After\n");
     zsim_elaborate_allocate_approximate(Tmp, size, GlobalType, GlobalMin, GlobalMax);
-    printf("After2\n");
     OldMallocHook = __malloc_hook;
     OldReallocHook = __realloc_hook;
     OldFreeHook = __free_hook;
