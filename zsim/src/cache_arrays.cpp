@@ -1205,6 +1205,7 @@ int32_t ApproximateDedupDataArray::preinsert(int32_t* tagPointer) {
         int32_t id = DIST->operator()(*RNG);
         if (tagPointerArray[id] == -1) {
             *tagPointer = tagPointerArray[id];
+            info("PRE: %i", id);
             return id;
         }
         if (tagCounterArray[id] < leastValue) {
@@ -1212,6 +1213,7 @@ int32_t ApproximateDedupDataArray::preinsert(int32_t* tagPointer) {
             leastId = id;
         }
     }
+    info("PRE: %i", leastId);
     *tagPointer = tagPointerArray[leastId];
     return leastId;
 }
@@ -1226,6 +1228,7 @@ void ApproximateDedupDataArray::postinsert(int32_t tagId, const MemReq* req, int
     if (data)
         PIN_SafeCopy(dataArray[dataId], data, zinfo->lineSize);
     rp->replaced(dataId);
+    info("POST: %i", dataId);
     tagCounterArray[dataId] = counter;
     tagPointerArray[dataId] = tagId;
     approximateArray[dataId] = approximate;
