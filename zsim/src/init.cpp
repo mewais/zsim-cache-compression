@@ -1080,6 +1080,8 @@ void SimInit(const char* configFile, const char* outputDir, uint32_t shmid) {
     zinfo->approximate = config.get<bool>("sim.approximate", false);
     zinfo->mapSize = config.get<uint32_t>("sim.mapSize", 14);
     zinfo->floatCutSize = config.get<uint32_t>("sim.floatCutSize", 16);
+    zinfo->mruListSize = config.get<uint32_t>("sim.mruListSize", 512);
+    zinfo->randomLoopTrial = config.get<uint32_t>("sim.randomLoopTrial", 10);
     zinfo->doubleCutSize = config.get<uint32_t>("sim.doubleCutSize", 32);
     zinfo->hashSize = config.get<uint32_t>("sim.hashSize", 16);
 

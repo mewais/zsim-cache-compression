@@ -202,6 +202,8 @@ struct GlobSimInfo {
     g_unordered_map<uint64_t, uint64_t>* realAddresses;
 
     uint32_t floatCutSize;
+    uint32_t mruListSize;
+    uint32_t randomLoopTrial;
     uint32_t doubleCutSize;
     uint16_t hashSize;
 };
