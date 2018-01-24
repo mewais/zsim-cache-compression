@@ -2,9 +2,11 @@
 #include "pin.H"
 
 ApproximateDedupBDICache::ApproximateDedupBDICache(uint32_t _numTagLines, uint32_t _numDataLines, CC* _cc, ApproximateDedupBDITagArray* _tagArray, ApproximateDedupBDIDataArray* _dataArray, ApproximateDedupBDIHashArray* _hashArray, ReplPolicy* tagRP, 
-ReplPolicy* dataRP, ReplPolicy* hashRP, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name, RunningStats* _crStats, 
+ReplPolicy* dataRP, ReplPolicy* hashRP, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name, RunningStats* _crStats,
 RunningStats* _evStats, RunningStats* _tutStats, RunningStats* _dutStats, Counter* _tag_hits, Counter* _tag_misses, Counter* _all_misses) : TimingCache(_numTagLines, _cc, NULL, tagRP, _accLat, _invLat, mshrs, tagLat, ways, cands, _domain, _name, _evStats, _tag_hits, _tag_misses, _all_misses), numTagLines(_numTagLines),
-numDataLines(_numDataLines), dataAssoc(ways), tagArray(_tagArray), dataArray(_dataArray), hashArray(_hashArray), tagRP(tagRP), dataRP(dataRP), hashRP(hashRP), crStats(_crStats), evStats(_evStats), tutStats(_tutStats), dutStats(_dutStats) {}
+numDataLines(_numDataLines), dataAssoc(ways), tagArray(_tagArray), dataArray(_dataArray), hashArray(_hashArray), tagRP(tagRP), dataRP(dataRP), hashRP(hashRP), crStats(_crStats), evStats(_evStats), tutStats(_tutStats), dutStats(_dutStats) {
+    dataArray->assignTagArray(tagArray);
+}
 
 void ApproximateDedupBDICache::initStats(AggregateStat* parentStat) {
     AggregateStat* cacheStat = new AggregateStat();
@@ -314,7 +316,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     // // info("Data is different, Collision.");
                     // Select data to evict
                     evictCycle = respCycle + accLat;
-                    int32_t victimDataId = dataArray->preinsert();
+                    int32_t victimDataId = dataArray->preinsert(lineSize);
 
                     // Now we need to know the available space in this set.
                     uint16_t freeSpace = 0;
@@ -410,7 +412,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                 // // info("Hash is different, nothing similar.");
                 // Select data to evict
                 evictCycle = respCycle + accLat;
-                int32_t victimDataId = dataArray->preinsert();
+                int32_t victimDataId = dataArray->preinsert(lineSize);
                 int32_t victimHashId = hashArray->preinsert(hash, &req);
 
                 // Now we need to know the available space in this set.
@@ -794,9 +796,9 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 int32_t LLHead = dataArray->readListHead(dataId, segmentId);
                                 dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL);
                             }
-                            int32_t victimDataId = dataArray->preinsert();
+                            int32_t victimDataId = dataArray->preinsert(lineSize);
                             while (victimDataId == dataId)
-                                victimDataId = dataArray->preinsert();
+                                victimDataId = dataArray->preinsert(lineSize);
 
                             // Now we need to know the available space in this set
                             uint16_t freeSpace = 0;
@@ -1002,9 +1004,9 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             int32_t LLHead = dataArray->readListHead(dataId, segmentId);
                             dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL);
                         }
-                        int32_t victimDataId = dataArray->preinsert();
+                        int32_t victimDataId = dataArray->preinsert(lineSize);
                         while (victimDataId == dataId)
-                            victimDataId = dataArray->preinsert();
+                            victimDataId = dataArray->preinsert(lineSize);
 
                         // Now we need to know the available space in this set
                         uint16_t freeSpace = 0;

@@ -33,6 +33,7 @@
 #include "pin.H"
 #include <cstdlib>
 #include <time.h>
+#include <algorithm>
 /* Set-associative array implementation */
 
 SetAssocArray::SetAssocArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf) : rp(_rp), hf(_hf), numLines(_numLines), assoc(_assoc)  {
@@ -1030,6 +1031,7 @@ ApproximateDedupTagArray::ApproximateDedupTagArray(uint32_t _numLines, uint32_t 
     numSets = numLines/assoc;
     setMask = numSets - 1;
     validLines = 0;
+    info("Dedup Tag Array: %i lines and %i sets", numLines, numSets);
     assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
 }
 
@@ -1173,6 +1175,7 @@ ApproximateDedupDataArray::ApproximateDedupDataArray(uint32_t _numLines, uint32_
     for (uint32_t i = 0; i < numLines; i++) {
         tagPointerArray[i] = -1;
         dataArray[i] = gm_calloc<uint8_t>(zinfo->lineSize);
+        freeList.push_back(i);
     }
     numSets = numLines/assoc;
     setMask = numSets - 1;
@@ -1181,6 +1184,7 @@ ApproximateDedupDataArray::ApproximateDedupDataArray(uint32_t _numLines, uint32_
     std::random_device rd;
     RNG = new std::mt19937(rd());
     DIST = new std::uniform_int_distribution<>(0, numLines-1);
+    info("Dedup Data Array: %i lines and %i sets", numLines, numSets);
     assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
 }
 
@@ -1201,11 +1205,17 @@ void ApproximateDedupDataArray::lookup(int32_t dataId, const MemReq* req, bool u
 int32_t ApproximateDedupDataArray::preinsert(int32_t* tagPointer) {
     int32_t leastValue = 999999;
     int32_t leastId = 0;
+    if (freeList.size()) {
+        leastId = freeList.back();
+        freeList.pop_back();
+        *tagPointer = tagPointerArray[leastId];
+        return leastId;
+    }
     for (uint32_t i = 0; i < 4; i++) {
         int32_t id = DIST->operator()(*RNG);
         if (tagPointerArray[id] == -1) {
             *tagPointer = tagPointerArray[id];
-            info("PRE: %i", id);
+            panic("Shouldn't happen");
             return id;
         }
         if (tagCounterArray[id] < leastValue) {
@@ -1213,7 +1223,6 @@ int32_t ApproximateDedupDataArray::preinsert(int32_t* tagPointer) {
             leastId = id;
         }
     }
-    info("PRE: %i", leastId);
     *tagPointer = tagPointerArray[leastId];
     return leastId;
 }
@@ -1221,14 +1230,19 @@ int32_t ApproximateDedupDataArray::preinsert(int32_t* tagPointer) {
 void ApproximateDedupDataArray::postinsert(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, bool approximate, DataLine data, bool updateReplacement) {
     if (tagPointerArray[dataId] == -1 && tagId != -1) {
         validLines++;
+        auto it = std::find(freeList.begin(), freeList.end(), dataId);
+        if(it != freeList.end()) {
+            auto index = std::distance(freeList.begin(), it);
+            freeList.erase(freeList.begin() + index);
+        }
     } else if (tagPointerArray[dataId] != -1 && tagId == -1) {
         validLines--;
+        freeList.push_back(dataId);
         assert(validLines);
     }
     if (data)
         PIN_SafeCopy(dataArray[dataId], data, zinfo->lineSize);
     rp->replaced(dataId);
-    info("POST: %i", dataId);
     tagCounterArray[dataId] = counter;
     tagPointerArray[dataId] = tagId;
     approximateArray[dataId] = approximate;
@@ -1643,11 +1657,12 @@ ApproximateDedupBDIDataArray::ApproximateDedupBDIDataArray(uint32_t _numLines, u
     tagCounterArray = gm_calloc<int32_t*>(numSets);
     tagPointerArray = gm_malloc<int32_t*>(numSets);
     // approximateArray = gm_calloc<bool>(numLines);
-    compressedDataArray = gm_calloc<DataLine*>(numSets);
+    compressedDataArray = gm_malloc<DataLine*>(numSets);
     for (uint32_t i = 0; i < numSets; i++) {
         tagCounterArray[i] = gm_calloc<int32_t>(assoc*zinfo->lineSize/8);
         tagPointerArray[i] = gm_calloc<int32_t>(assoc*zinfo->lineSize/8);
         compressedDataArray[i] = gm_calloc<DataLine>(assoc*zinfo->lineSize/8);
+        freeList.push_back(i);
         for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++) {
             tagPointerArray[i][j] = -1;
             compressedDataArray[i][j] = gm_calloc<uint8_t>(zinfo->lineSize);
@@ -1659,6 +1674,7 @@ ApproximateDedupBDIDataArray::ApproximateDedupBDIDataArray(uint32_t _numLines, u
     std::random_device rd;
     RNG = new std::mt19937(rd());
     DIST = new std::uniform_int_distribution<>(0, numSets-1);
+    DIST2 = new std::uniform_int_distribution<>(0, 3);
     assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
 }
 
@@ -1676,43 +1692,75 @@ ApproximateDedupBDIDataArray::~ApproximateDedupBDIDataArray() {
     gm_free(compressedDataArray);
 }
 
-void ApproximateDedupBDIDataArray::lookup(int32_t dataId, const MemReq* req, bool updateReplacement) {
-    // if (updateReplacement) rp->update(dataId, req);
+void ApproximateDedupBDIDataArray::lookup(int32_t dataId, int32_t segmentId, const MemReq* req, bool updateReplacement) {
+    // if (updateReplacement) rp[dataId]->update(segmentId, req);
 }
 
-int32_t ApproximateDedupBDIDataArray::preinsert() {
-    int32_t leastValue = 999999;
-    int32_t leastId = 0;
+void ApproximateDedupBDIDataArray::assignTagArray(ApproximateDedupBDITagArray* _tagArray) {
+        tagArray = _tagArray;
+}
+
+int32_t ApproximateDedupBDIDataArray::preinsert(uint16_t lineSize) {
+    victimVector.clear();
+    int32_t leastId;
+    if (freeList.size()) {
+        leastId = freeList.back();
+        freeList.pop_back();
+        return leastId;
+    }
     for (uint32_t i = 0; i < 4; i++) {
         int32_t id = DIST->operator()(*RNG);
         int32_t counts = 0;
-        for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++)
+        int32_t sizes = 0;
+        for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++) {
             counts += tagCounterArray[id][j];
-        if (counts == 0)
-            return id;
-        if (counts < leastValue) {
-            leastId = id;
-            leastValue = counts;
+            if (tagCounterArray[id][j])
+                sizes += BDICompressionToSize(tagArray->readCompressionEncoding(tagPointerArray[id][j]), zinfo->lineSize);
         }
+        if (counts == 0)
+            panic("Cannot happen");
+        if (assoc*zinfo->lineSize - sizes >= lineSize)
+            return id;
+        leastId = id;
     }
+    g_vector<uint32_t> segmentsVector;
+    for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++) segmentsVector.push_back(j);
+    std::random_shuffle(segmentsVector.begin(), segmentsVector.end());
     return leastId;
 }
 
 int32_t ApproximateDedupBDIDataArray::preinsert(int32_t dataId, int32_t* tagId, g_vector<uint32_t>& exceptions) {
     int32_t leastValue = 999999;
     int32_t leastId = 0;
-    for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++) {
-        bool Found = false;
-        for (uint32_t i = 0; i < exceptions.size(); i++)
-            if (j == exceptions[i]) {
-                Found = true;
-                break;
+    if (victimVector.size()) {
+        for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++) {
+            bool Found = false;
+            for (uint32_t i = 0; i < exceptions.size(); i++)
+                if (victimVector[j] == exceptions[i]) {
+                    Found = true;
+                    break;
+                }
+            if (Found)
+                continue;
+            if (tagCounterArray[dataId][victimVector[j]] < leastValue) {
+                leastValue = tagCounterArray[dataId][victimVector[j]];
+                leastId = victimVector[j];
             }
-        if (Found)
-            continue;
-        if (tagCounterArray[dataId][j] < leastValue) {
-            leastValue = tagCounterArray[dataId][j];
-            leastId = j;
+        }
+    } else {
+        for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++) {
+            bool Found = false;
+            for (uint32_t i = 0; i < exceptions.size(); i++)
+                if (j == exceptions[i]) {
+                    Found = true;
+                    break;
+                }
+            if (Found)
+                continue;
+            if (tagCounterArray[dataId][j] < leastValue) {
+                leastValue = tagCounterArray[dataId][j];
+                leastId = j;
+            }
         }
     }
     *tagId = tagPointerArray[dataId][leastId];
@@ -1720,16 +1768,26 @@ int32_t ApproximateDedupBDIDataArray::preinsert(int32_t dataId, int32_t* tagId, 
 }
 
 void ApproximateDedupBDIDataArray::postinsert(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, int32_t segmentId, DataLine data) {
+    tagCounterArray[dataId][segmentId] = counter;
     if (tagPointerArray[dataId][segmentId] == -1 && tagId != -1) {
         validLines++;
+        auto it = std::find(freeList.begin(), freeList.end(), dataId);
+        if(it != freeList.end()) {
+            auto index = std::distance(freeList.begin(), it);
+            freeList.erase(freeList.begin() + index);
+        }
     } else if (tagPointerArray[dataId][segmentId] != -1 && tagId == -1) {
         validLines--;
+        int count = 0;
+        for (uint32_t i = 0; i < assoc*zinfo->lineSize/8; i++)
+            count += tagCounterArray[dataId][i];
+        if (!count)
+            freeList.push_back(dataId);
     }
+    tagPointerArray[dataId][segmentId] = tagId;
     if (data)
         PIN_SafeCopy(compressedDataArray[dataId][segmentId], data, zinfo->lineSize);
     // info("Data was %i,%i: %i, %i", dataId, segmentId, tagCounterArray[dataId][segmentId], tagPointerArray[dataId][segmentId]);
-    tagCounterArray[dataId][segmentId] = counter;
-    tagPointerArray[dataId][segmentId] = tagId;
     // info("Data is %i,%i: %i, %i", dataId, segmentId, counter, tagId);
 }
 

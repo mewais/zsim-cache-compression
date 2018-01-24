@@ -266,6 +266,7 @@ class ApproximateDedupDataArray {
         uint32_t validLines;
         std::mt19937* RNG;
         std::uniform_int_distribution<>* DIST;
+        g_vector<int32_t> freeList;
 
     public:
         ApproximateDedupDataArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
@@ -376,12 +377,17 @@ class ApproximateDedupBDIDataArray : public ApproximateBDIDataArray {
         uint32_t validLines;
         std::mt19937* RNG;
         std::uniform_int_distribution<>* DIST;
+        std::uniform_int_distribution<>* DIST2;
+        g_vector<int32_t> freeList;
+        ApproximateDedupBDITagArray* tagArray;
+        g_vector<uint32_t> victimVector;
 
     public:
         ApproximateDedupBDIDataArray(uint32_t _numLines, uint32_t _assoc, HashFamily* _hf);
         ~ApproximateDedupBDIDataArray();
-        void lookup(int32_t dataId, const MemReq* req, bool updateReplacement);
-        int32_t preinsert();
+        void assignTagArray(ApproximateDedupBDITagArray* _tagArray);
+        void lookup(int32_t dataId, int32_t segmentId, const MemReq* req, bool updateReplacement);
+        int32_t preinsert(uint16_t lineSize);
         int32_t preinsert(int32_t dataId, int32_t* tagId, g_vector<uint32_t>& exceptions);
         // Actually inserts
         void postinsert(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, int32_t segmentId, DataLine data);
