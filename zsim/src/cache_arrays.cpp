@@ -1389,54 +1389,32 @@ uint64_t ApproximateDedupHashArray::hash(const DataLine data)
     uint8_t _6;
     uint8_t _7;
     uint8_t* dataLine = (uint8_t*) data;
-    // --------------------------------------------------------------------
+
+    uint64_t XORs =0;
     uint8_t xorNeeded = zinfo->lineSize/8;
-    if (  xorNeeded == 8 )
-    {
-        _0 = dataLine[0] ^ dataLine[0+8] ^ dataLine[0+16] ^ dataLine[0+24] ^ dataLine[0+32] ^ dataLine[0+40] ^ dataLine[0+48] ^ dataLine[0+56];
-        _1 = dataLine[1] ^ dataLine[1+8] ^ dataLine[1+16] ^ dataLine[1+24] ^ dataLine[1+32] ^ dataLine[1+40] ^ dataLine[1+48] ^ dataLine[1+56];
-        _2 = dataLine[2] ^ dataLine[2+8] ^ dataLine[2+16] ^ dataLine[2+24] ^ dataLine[2+32] ^ dataLine[2+40] ^ dataLine[2+48] ^ dataLine[2+56];
-        _3 = dataLine[3] ^ dataLine[3+8] ^ dataLine[3+16] ^ dataLine[3+24] ^ dataLine[3+32] ^ dataLine[3+40] ^ dataLine[3+48] ^ dataLine[3+56];
-        _4 = dataLine[4] ^ dataLine[4+8] ^ dataLine[4+16] ^ dataLine[4+24] ^ dataLine[4+32] ^ dataLine[4+40] ^ dataLine[4+48] ^ dataLine[4+56];
-        _5 = dataLine[5] ^ dataLine[5+8] ^ dataLine[5+16] ^ dataLine[5+24] ^ dataLine[5+32] ^ dataLine[5+40] ^ dataLine[5+48] ^ dataLine[5+56];
-        _6 = dataLine[6] ^ dataLine[6+8] ^ dataLine[6+16] ^ dataLine[6+24] ^ dataLine[6+32] ^ dataLine[6+40] ^ dataLine[6+48] ^ dataLine[6+56];
-        _7 = dataLine[7] ^ dataLine[7+8] ^ dataLine[7+16] ^ dataLine[7+24] ^ dataLine[7+32] ^ dataLine[7+40] ^ dataLine[7+48] ^ dataLine[7+56];
-    }
-    else if ( xorNeeded == 4 )
-    {
 
-        _0 = dataLine[0] ^ dataLine[0+8] ^ dataLine[0+16] ^ dataLine[0+24];
-        _1 = dataLine[1] ^ dataLine[1+8] ^ dataLine[1+16] ^ dataLine[1+24];
-        _2 = dataLine[2] ^ dataLine[2+8] ^ dataLine[2+16] ^ dataLine[2+24];
-        _3 = dataLine[3] ^ dataLine[3+8] ^ dataLine[3+16] ^ dataLine[3+24];
-        _4 = dataLine[4] ^ dataLine[4+8] ^ dataLine[4+16] ^ dataLine[4+24];
-        _5 = dataLine[5] ^ dataLine[5+8] ^ dataLine[5+16] ^ dataLine[5+24];
-        _6 = dataLine[6] ^ dataLine[6+8] ^ dataLine[6+16] ^ dataLine[6+24];
-        _7 = dataLine[7] ^ dataLine[7+8] ^ dataLine[7+16] ^ dataLine[7+24];
+    if ((xorNeeded == 2) || (xorNeeded == 4) || (xorNeeded == 8)) {
+        for (int i=0; i < xorNeeded; i++) {
+            _0 =  dataLine[0+8*i];
+            _1 =  dataLine[1+8*i];
+            _2 =  dataLine[2+8*i];
+            _3 =  dataLine[3+8*i];
+            _4 =  dataLine[4+8*i];
+            _5 =  dataLine[5+8*i];
+            _6 =  dataLine[6+8*i];
+            _7 =  dataLine[7+8*i];
 
-    } else if ( xorNeeded == 2 )
-    {
-        _0 = dataLine[0] ^ dataLine[0+8];
-        _1 = dataLine[1] ^ dataLine[1+8];
-        _2 = dataLine[2] ^ dataLine[2+8];
-        _3 = dataLine[3] ^ dataLine[3+8];
-        _4 = dataLine[4] ^ dataLine[4+8];
-        _5 = dataLine[5] ^ dataLine[5+8];
-        _6 = dataLine[6] ^ dataLine[6+8];
-        _7 = dataLine[7] ^ dataLine[7+8];
-    } else
-    {
+            uint64_t step_64B = ((uint64_t) _0) + (((uint64_t) _1) << 8)  + (((uint64_t) _2) << 16) + (((uint64_t) _3) << 24)
+                            + (((uint64_t) _4) << 32) + (((uint64_t) _5) << 40) + (((uint64_t) _6) << 48) + (((uint64_t) _7) << 56);
+
+            XORs = XORs ^ dataHash->hash(0, step_64B);
+        }
+    } else {
         panic("not implemented yet for lines other than 16B/32B/64B");
     }
-    // --------------------------------------------------------------------
-    uint64_t XORs =       ((uint64_t) _0) + (((uint64_t) _1) << 8)  + (((uint64_t) _2) << 16) + (((uint64_t) _3) << 24)
-    + (((uint64_t) _4) << 32) + (((uint64_t) _5) << 40) + (((uint64_t) _6) << 48) + (((uint64_t) _7) << 56) ;
 
-    uint64_t hashKey = dataHash->hash(0,XORs) & ((uint64_t)std::pow(2, (zinfo->hashSize))-1); // /*<< hashWayBits;*/
-
-    return hashKey;
+    return XORs & ((uint64_t)std::pow(2, (zinfo->hashSize))-1);
 }
-
 void ApproximateDedupHashArray::print() {
     for (uint32_t i = 0; i < this->numLines; i++) {
         if (dataPointerArray[i] != -1)
