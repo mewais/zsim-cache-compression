@@ -145,22 +145,20 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                 // Clear (Evict, Tags already evicted) data line
                 dataArray->postinsert(-1, &req, 0, victimDataId, victimSegmentId, NULL, false);
                 // // // info("SHOULD DOWN");
-                tagArray->postinsert(0, &req, victimTagId, -1, -1, NONE, -1, false);
             } else if (newLLHead != -1) {
                 // Change Tag
                 // info("\t\tAnd decremented tag counter and decremented LL Head for dataId, SegmentId %i, %i", victimDataId, victimSegmentId);
                 uint32_t victimCounter = dataArray->readCounter(victimDataId, victimSegmentId);
                 dataArray->postinsert(newLLHead, &req, victimCounter-1, victimDataId, victimSegmentId, NULL, false);
                 // // // info("SHOULDN'T1");
-                tagArray->postinsert(0, &req, victimTagId, -1, -1, NONE, -1, false);
             } else if (victimDataId != -1 && victimSegmentId != -1) {
                 // info("\t\tAnd decremented dedup counter for dataId, segmentId %i, %i.", victimDataId, victimSegmentId);
                 // // // info("SHOULDN'T2");
                 uint32_t victimCounter = dataArray->readCounter(victimDataId, victimSegmentId);
                 int32_t LLHead = dataArray->readListHead(victimDataId, victimSegmentId);
                 dataArray->postinsert(LLHead, &req, victimCounter-1, victimDataId, victimSegmentId, NULL, false);
-                tagArray->postinsert(0, &req, victimTagId, -1, -1, NONE, -1, false);
             }
+            tagArray->postinsert(0, &req, victimTagId, -1, -1, NONE, -1, false);
             if (evRec->hasRecord()) {
                 // // info("\t\tEvicting tagId: %i", victimTagId);
                 Evictions++;
@@ -196,6 +194,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     g_vector<uint32_t> keptFromEvictions;
                     uint64_t lastEvDoneCycle = evictCycle;
                     uint64_t evBeginCycle = evictCycle;
+                    dataId = dataArray->preinsert(lineSize);
                     do {
                         uint16_t occupiedSpace = 0;
                         for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
@@ -245,10 +244,10 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         dataArray->postinsert(-1, &req, 0, dataId, victimSegmentId, NULL, false);
                     } while (freeSpace < lineSize);
                     // // // info("SHOULD UP");
-                    tagArray->postinsert(req.lineAddr, &req, victimTagId, dataId, segmentId, encoding, -1, true);
+                    tagArray->postinsert(req.lineAddr, &req, victimTagId, dataId, keptFromEvictions[0], encoding, -1, true);
                     // // info("postinsert %i", victimTagId);
-                    dataArray->postinsert(victimTagId, &req, 1, dataId, segmentId, data, updateReplacement);
-                    hashArray->postinsert(hash, &req, dataId, segmentId, hashId, true);
+                    dataArray->postinsert(victimTagId, &req, 1, dataId, keptFromEvictions[0], data, updateReplacement);
+                    hashArray->postinsert(hash, &req, dataId, keptFromEvictions[0], hashId, true);
                     assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
                     mse = new (evRec) MissStartEvent(this, accLat, domain);
                     // // // info("uCREATE: %p at %u", mse, __LINE__);
@@ -560,6 +559,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         g_vector<uint32_t> keptFromEvictions;
                         uint64_t lastEvDoneCycle = evictCycle;
                         uint64_t evBeginCycle = evictCycle;
+                        targetDataId = dataArray->preinsert(lineSize);
                         do {
                             uint16_t occupiedSpace = 0;
                             for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
@@ -611,10 +611,10 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         } while (freeSpace < lineSize);
                         respCycle = lastEvDoneCycle;
                         // // // info("SHOULD UP");
-                        tagArray->postinsert(req.lineAddr, &req, tagId, targetDataId, targetSegmentId, encoding, -1, updateReplacement);
+                        tagArray->postinsert(req.lineAddr, &req, tagId, targetDataId, keptFromEvictions[0], encoding, -1, updateReplacement);
                         // // info("postinsert %i", tagId);
-                        dataArray->postinsert(tagId, &req, 1, targetDataId, targetSegmentId, data, updateReplacement);
-                        hashArray->postinsert(hash, &req, targetDataId, targetSegmentId, hashId, updateReplacement);
+                        dataArray->postinsert(tagId, &req, 1, targetDataId, keptFromEvictions[0], data, updateReplacement);
+                        hashArray->postinsert(hash, &req, targetDataId, keptFromEvictions[0], hashId, updateReplacement);
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -685,14 +685,32 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         dataId = tagArray->readDataId(tagId);
                         segmentId = tagArray->readSegmentPointer(tagId);
                         if (dataArray->readCounter(dataId, segmentId) == 1) {
-                            // info("\t\tOnly had one tag. Overwriting self instead of picking random data victim.");
                             // Data only exists once, just update.
                             // // info("PUTX only once.");
-                            int32_t victimDataId = dataId;
+                            int32_t newLLHead;
+                            bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead);
+                            if (evictDataLine) {
+                                // info("\t\tDeleting old dataId at %i", dataId);
+                                // // info("\t\tAlong with dataId: %i", dataId);
+                                // Clear (Evict, Tags already evicted) data line
+                                dataArray->postinsert(-1, &req, 0, dataId, segmentId, NULL, false);
+                                tagArray->postinsert(0, &req, tagId, -1, -1, NONE, -1, false);
+                            } else if (newLLHead != -1) {
+                                // info("\t\tchanging LL pointer for old dataId at %i and decremented it's counter", dataId);
+                                // Change Tag
+                                uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
+                                dataArray->postinsert(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                            } else {
+                                // info("\t\tdecremented the counter at dataId %i", dataId);
+                                uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
+                                int32_t LLHead = dataArray->readListHead(dataId, segmentId);
+                                dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                            }
+                            int32_t victimDataId = dataArray->preinsert(lineSize);
                             // Now we need to know the available space in this set
                             uint16_t freeSpace = 0;
                             g_vector<uint32_t> keptFromEvictions;
-                            keptFromEvictions.push_back(segmentId);
+                            // info("\t\tOnly had one tag. picked victim dataId: %i", victimDataId);"
                             evictCycle += accLat;
                             uint64_t lastEvDoneCycle = evictCycle;
                             uint64_t evBeginCycle = evictCycle;
@@ -743,12 +761,12 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 }
                                 // info("\t\tand freed %i segments", size);
                                 dataArray->postinsert(-1, &req, 0, victimDataId, victimSegmentId, NULL, false);
-                            } while (freeSpace + BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize) < lineSize);
+                            } while (freeSpace < lineSize);
                             respCycle = lastEvDoneCycle;
-                            dataArray->writeData(dataId, segmentId, data, &req, updateReplacement);
                             // // // info("SHOULD CHANGE");
-                            tagArray->writeCompressionEncoding(tagId, encoding);
-                            hashArray->changeInPlace(hash, &req, dataId, segmentId, hashId, updateReplacement);
+                            tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement);
+                            dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data, updateReplacement);
+                            hashArray->changeInPlace(hash, &req, victimDataId, keptFromEvictions[0], hashId, updateReplacement);
                             uint64_t getDoneCycle = respCycle;
                             respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -780,11 +798,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             int32_t newLLHead;
                             bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead);
                             if (evictDataLine) {
-                                // info("\t\tDeleting old dataId at %i", dataId);
-                                // // info("\t\tAlong with dataId: %i", dataId);
-                                // Clear (Evict, Tags already evicted) data line
-                                dataArray->postinsert(-1, &req, 0, dataId, segmentId, NULL, false);
-                                tagArray->postinsert(0, &req, tagId, -1, -1, NONE, -1, false);
+                                panic("Shouldn't happen %i, %i, %i", tagId, dataId, segmentId);
                             } else if (newLLHead != -1) {
                                 // info("\t\tchanging LL pointer for old dataId at %i and decremented it's counter", dataId);
                                 // Change Tag
@@ -797,8 +811,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
                             }
                             int32_t victimDataId = dataArray->preinsert(lineSize);
-                            while (victimDataId == dataId)
-                                victimDataId = dataArray->preinsert(lineSize);
 
                             // Now we need to know the available space in this set
                             uint16_t freeSpace = 0;
@@ -892,14 +904,32 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                 } else {
                     // info("\t\tCouldn't find a matching hash.");
                     if (dataArray->readCounter(dataId, segmentId) == 1) {
-                        // info("\t\tOnly had one tag. Overwriting self instead of picking random data victim.");
                         // Data only exists once, just update.
                         // // info("PUTX only once.");
-                        int32_t victimDataId = dataId;
+                        int32_t newLLHead;
+                        bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead);
+                        if (evictDataLine) {
+                            // info("\t\tDeleting old dataId at %i", dataId);
+                            // // info("\t\tAlong with dataId: %i", dataId);
+                            // Clear (Evict, Tags already evicted) data line
+                            dataArray->postinsert(-1, &req, 0, dataId, segmentId, NULL, false);
+                            tagArray->postinsert(0, &req, tagId, -1, -1, NONE, -1, false);
+                        } else if (newLLHead != -1) {
+                            // info("\t\tchanging LL pointer for old dataId at %i and decremented it's counter", dataId);
+                            // Change Tag
+                            uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
+                            dataArray->postinsert(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                        } else {
+                            // info("\t\tdecremented the counter at dataId %i", dataId);
+                            uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
+                            int32_t LLHead = dataArray->readListHead(dataId, segmentId);
+                            dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                        }
+                        int32_t victimDataId = dataArray->preinsert(lineSize);
                         // Now we need to know the available space in this set
                         uint16_t freeSpace = 0;
                         g_vector<uint32_t> keptFromEvictions;
-                        keptFromEvictions.push_back(segmentId);
+                        // info("\t\tOnly had one tag. picked victim dataId: %i", victimDataId);"
                         evictCycle += accLat;
                         uint64_t lastEvDoneCycle = evictCycle;
                         uint64_t evBeginCycle = evictCycle;
@@ -950,13 +980,13 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             }
                             // info("\t\tand freed %i segments", size);
                             dataArray->postinsert(-1, &req, 0, victimDataId, victimSegmentId, NULL, false);
-                        } while (freeSpace + BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize) < lineSize);
+                        } while (freeSpace < lineSize);
                         respCycle = lastEvDoneCycle;
-                        dataArray->writeData(dataId, segmentId, data, &req, updateReplacement);
                         // // // info("SHOULD CHANGE");
-                        tagArray->writeCompressionEncoding(tagId, encoding);
+                        tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement);
+                        dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data, updateReplacement);
                         hashId = hashArray->preinsert(hash, &req);
-                        hashArray->postinsert(hash, &req, dataId, segmentId, hashId, updateReplacement);
+                        hashArray->postinsert(hash, &req, victimDataId, keptFromEvictions[0], hashId, updateReplacement);
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -988,11 +1018,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         int32_t newLLHead;
                         bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead);
                         if (evictDataLine) {
-                            // info("\t\tDeleting old dataId at %i", dataId);
-                            // // info("\t\tAlong with dataId: %i", dataId);
-                            // Clear (Evict, Tags already evicted) data line
-                            dataArray->postinsert(-1, &req, 0, dataId, segmentId, NULL, false);
-                            tagArray->postinsert(0, &req, tagId, -1, -1, NONE, -1, false);
+                            panic("Shouldn't happen %i, %i, %i", tagId, dataId, segmentId);
                         } else if (newLLHead != -1) {
                             // info("\t\tchanging LL pointer for old dataId at %i and decremented it's counter", dataId);
                             // Change Tag
@@ -1005,8 +1031,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
                         }
                         int32_t victimDataId = dataArray->preinsert(lineSize);
-                        while (victimDataId == dataId)
-                            victimDataId = dataArray->preinsert(lineSize);
 
                         // Now we need to know the available space in this set
                         uint16_t freeSpace = 0;
