@@ -1,7 +1,7 @@
 #include "approximatededupbdi_cache.h"
 #include "pin.H"
 
-ApproximateDedupBDICache::ApproximateDedupBDICache(uint32_t _numTagLines, uint32_t _numDataLines, CC* _cc, ApproximateDedupBDITagArray* _tagArray, ApproximateDedupBDIDataArray* _dataArray, ApproximateDedupBDIHashArray* _hashArray, ReplPolicy* tagRP, 
+ApproximateDedupBDICache::ApproximateDedupBDICache(uint32_t _numTagLines, uint32_t _numDataLines, CC* _cc, ApproximateDedupBDITagArray* _tagArray, ApproximateDedupBDIDataArray* _dataArray, ApproximateDedupBDIHashArray* _hashArray, ReplPolicy* tagRP,
 ReplPolicy* dataRP, ReplPolicy* hashRP, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name, RunningStats* _crStats,
 RunningStats* _evStats, RunningStats* _tutStats, RunningStats* _dutStats, Counter* _tag_hits, Counter* _tag_misses, Counter* _all_misses) : TimingCache(_numTagLines, _cc, NULL, tagRP, _accLat, _invLat, mshrs, tagLat, ways, cands, _domain, _name, _evStats, _tag_hits, _tag_misses, _all_misses), numTagLines(_numTagLines),
 numDataLines(_numDataLines), dataAssoc(ways), tagArray(_tagArray), dataArray(_dataArray), hashArray(_hashArray), tagRP(tagRP), dataRP(dataRP), hashRP(hashRP), crStats(_crStats), evStats(_evStats), tutStats(_tutStats), dutStats(_dutStats) {
@@ -710,7 +710,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             // Now we need to know the available space in this set
                             uint16_t freeSpace = 0;
                             g_vector<uint32_t> keptFromEvictions;
-                            // info("\t\tOnly had one tag. picked victim dataId: %i", victimDataId);"
+                            // info("\t\tOnly had one tag. picked victim dataId: %i", victimDataId);
                             evictCycle += accLat;
                             uint64_t lastEvDoneCycle = evictCycle;
                             uint64_t evBeginCycle = evictCycle;
@@ -736,7 +736,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                                 while (victimListHeadId != -1) {
                                     if (victimListHeadId != tagId) {
-                                        // info("\t\tEvicting TagId: %i", victimListHeadId); 
+                                        // info("\t\tEvicting TagId: %i", victimListHeadId);
                                         Address wbLineAddr = tagArray->readAddress(victimListHeadId);
                                         // // info("\t\tEvicting tagId: %i, %lu", victimListHeadId, wbLineAddr);
                                         evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
@@ -840,7 +840,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                                 while (victimListHeadId != -1) {
                                     if (victimListHeadId != tagId) {
-                                        // info("\t\tEvicting TagId: %i", victimListHeadId); 
+                                        // info("\t\tEvicting TagId: %i", victimListHeadId);
                                         Address wbLineAddr = tagArray->readAddress(victimListHeadId);
                                         // // info("\t\tEvicting tagId: %i, %lu", victimListHeadId, wbLineAddr);
                                         evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
@@ -929,7 +929,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         // Now we need to know the available space in this set
                         uint16_t freeSpace = 0;
                         g_vector<uint32_t> keptFromEvictions;
-                        // info("\t\tOnly had one tag. picked victim dataId: %i", victimDataId);"
+                        // info("\t\tOnly had one tag. picked victim dataId: %i", victimDataId);
                         evictCycle += accLat;
                         uint64_t lastEvDoneCycle = evictCycle;
                         uint64_t evBeginCycle = evictCycle;
@@ -955,7 +955,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             while (victimListHeadId != -1) {
                                 if (victimListHeadId != tagId) {
-                                    // info("\t\tEvicting TagId: %i", victimListHeadId); 
+                                    // info("\t\tEvicting TagId: %i", victimListHeadId);
                                     Address wbLineAddr = tagArray->readAddress(victimListHeadId);
                                     // // info("\t\tEvicting tagId: %i, %lu", victimListHeadId, wbLineAddr);
                                     evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
@@ -1060,7 +1060,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             while (victimListHeadId != -1) {
                                 if (victimListHeadId != tagId) {
-                                    // info("\t\tEvicting TagId: %i", victimListHeadId); 
+                                    // info("\t\tEvicting TagId: %i", victimListHeadId);
                                     Address wbLineAddr = tagArray->readAddress(victimListHeadId);
                                     // // info("\t\tEvicting tagId: %i, %lu", victimListHeadId, wbLineAddr);
                                     evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
@@ -1149,10 +1149,14 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
     // uint32_t dataValidSegments = 0;
     // for (uint32_t i = 0; i < numDataLines/dataAssoc; i++)
     // {
+    //     uint32_t singleSetCount = 0;
     //     for (uint32_t j = 0; j < dataAssoc*8; j++)
     //     {
-    //         if (dataArray->readListHead(i, j) != -1)
+    //         if (dataArray->readListHead(i, j) != -1) {
     //             dataValidSegments += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(i, j)), zinfo->lineSize)/8;
+    //             singleSetCount += BDICompressionToSize(tagArray->readCompressionEncoding(dataArray->readListHead(i, j)), zinfo->lineSize)/8;
+    //         }
+    //         assert(singleSetCount <= dataAssoc*8);
     //     }
     // }
     // info("Valid Tags: %u", tagArray->getValidLines());
