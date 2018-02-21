@@ -755,8 +755,8 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
     }
     cc->endAccess(req);
 
-    info("Valid Tags: %u", tagArray->getValidLines());
-    info("Valid Lines: %u", dataArray->getValidLines());
+    // info("Valid Tags: %u", tagArray->getValidLines());
+    // info("Valid Lines: %u", dataArray->getValidLines());
     assert(tagArray->getValidLines() == tagArray->countValidLines());
     assert(dataArray->getValidLines() == dataArray->countValidLines());
     assert(tagArray->getValidLines() >= dataArray->getValidLines());
