@@ -380,13 +380,8 @@ class ApproximateDedupBDIDataArray : public ApproximateBDIDataArray {
         std::uniform_int_distribution<>* DIST;
         g_vector<int32_t> freeList;
         ApproximateDedupBDITagArray* tagArray;
-
-	g_vector<int32_t> MRUList;
-	uint32_t MRU_SIZE;//512; // how many sets to record
-	/*
-	int32_t*  MRU_SETS;
-	int32_t MRU_ptr;
-	*/
+        g_vector<int32_t> MRUList;
+        uint32_t MRU_SIZE; // how many sets to record
 
     public:
         ApproximateDedupBDIDataArray(uint32_t _numLines, uint32_t _assoc, HashFamily* _hf);
@@ -397,6 +392,7 @@ class ApproximateDedupBDIDataArray : public ApproximateBDIDataArray {
         int32_t preinsert(int32_t dataId, int32_t* tagId, g_vector<uint32_t>& exceptions);
         // Actually inserts
         void postinsert(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, int32_t segmentId, DataLine data, bool updateReplacement);
+        void changeInPlace(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, int32_t segmentId, DataLine data, bool updateReplacement);
         void writeData(int32_t dataId, int32_t segmentId, DataLine data, const MemReq* req, bool updateReplacement);
         bool isSame(int32_t dataId, int32_t segmentId, DataLine data);
         // returns tagId

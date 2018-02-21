@@ -149,14 +149,14 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                 // Change Tag
                 // info("\t\tAnd decremented tag counter and decremented LL Head for dataId, SegmentId %i, %i", victimDataId, victimSegmentId);
                 uint32_t victimCounter = dataArray->readCounter(victimDataId, victimSegmentId);
-                dataArray->postinsert(newLLHead, &req, victimCounter-1, victimDataId, victimSegmentId, NULL, false);
+                dataArray->changeInPlace(newLLHead, &req, victimCounter-1, victimDataId, victimSegmentId, NULL, false);
                 // // // info("SHOULDN'T1");
             } else if (victimDataId != -1 && victimSegmentId != -1) {
                 // info("\t\tAnd decremented dedup counter for dataId, segmentId %i, %i.", victimDataId, victimSegmentId);
                 // // // info("SHOULDN'T2");
                 uint32_t victimCounter = dataArray->readCounter(victimDataId, victimSegmentId);
                 int32_t LLHead = dataArray->readListHead(victimDataId, victimSegmentId);
-                dataArray->postinsert(LLHead, &req, victimCounter-1, victimDataId, victimSegmentId, NULL, false);
+                dataArray->changeInPlace(LLHead, &req, victimCounter-1, victimDataId, victimSegmentId, NULL, false);
             }
             tagArray->postinsert(0, &req, victimTagId, -1, -1, NONE, -1, false);
             if (evRec->hasRecord()) {
@@ -286,7 +286,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     // // // info("SHOULDN'T");
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, dataId, segmentId, encoding, oldListHead, true);
                     // // info("postinsert %i", victimTagId);
-                    dataArray->postinsert(victimTagId, &req, dataCounter+1, dataId, segmentId, NULL, updateReplacement);
+                    dataArray->changeInPlace(victimTagId, &req, dataCounter+1, dataId, segmentId, NULL, updateReplacement);
                     hashArray->postinsert(hash, &req, dataId, segmentId, hashId, true);
 
                     assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
@@ -544,12 +544,12 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             // Change Tag
                             // info("\t\tchanging LL pointer for old dataId at %i and decremented it's counter", dataId);
                             uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
-                            dataArray->postinsert(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                            dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
                         } else {
                             // info("\t\tdecremented the counter at dataId %i", dataId);
                             uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
                             int32_t LLHead = dataArray->readListHead(dataId, segmentId);
-                            dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                            dataArray->changeInPlace(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
                         }
 
                         respCycle += accLat;
@@ -655,12 +655,12 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             // info("\t\tchanging LL pointer for old dataId at %i and decremented it's counter", dataId);
                             // Change Tag
                             uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
-                            dataArray->postinsert(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                            dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
                         } else {
                             // info("\t\tdecremented the counter at dataId %i", dataId);
                             uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
                             int32_t LLHead = dataArray->readListHead(dataId, segmentId);
-                            dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                            dataArray->changeInPlace(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
                         }
                         // // info("Data is also similar.");
                         int32_t oldListHead = dataArray->readListHead(targetDataId, targetSegmentId);
@@ -668,7 +668,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         // // // info("SHOULDN'T");
                         tagArray->changeInPlace(req.lineAddr, &req, tagId, targetDataId, targetSegmentId, encoding, oldListHead, true);
                         // // info("postinsert %i", tagId);
-                        dataArray->postinsert(tagId, &req, dataCounter+1, targetDataId, targetSegmentId, NULL, updateReplacement);
+                        dataArray->changeInPlace(tagId, &req, dataCounter+1, targetDataId, targetSegmentId, NULL, updateReplacement);
                         hashArray->postinsert(hash, &req, targetDataId, targetSegmentId, hashId, updateReplacement);
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
@@ -699,12 +699,12 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 // info("\t\tchanging LL pointer for old dataId at %i and decremented it's counter", dataId);
                                 // Change Tag
                                 uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
-                                dataArray->postinsert(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                                dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
                             } else {
                                 // info("\t\tdecremented the counter at dataId %i", dataId);
                                 uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
                                 int32_t LLHead = dataArray->readListHead(dataId, segmentId);
-                                dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                                dataArray->changeInPlace(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
                             }
                             int32_t victimDataId = dataArray->preinsert(lineSize);
                             // Now we need to know the available space in this set
@@ -803,12 +803,12 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 // info("\t\tchanging LL pointer for old dataId at %i and decremented it's counter", dataId);
                                 // Change Tag
                                 uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
-                                dataArray->postinsert(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                                dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
                             } else {
                                 // info("\t\tdecremented the counter at dataId %i", dataId);
                                 uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
                                 int32_t LLHead = dataArray->readListHead(dataId, segmentId);
-                                dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                                dataArray->changeInPlace(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
                             }
                             int32_t victimDataId = dataArray->preinsert(lineSize);
 
@@ -918,12 +918,12 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             // info("\t\tchanging LL pointer for old dataId at %i and decremented it's counter", dataId);
                             // Change Tag
                             uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
-                            dataArray->postinsert(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                            dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
                         } else {
                             // info("\t\tdecremented the counter at dataId %i", dataId);
                             uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
                             int32_t LLHead = dataArray->readListHead(dataId, segmentId);
-                            dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                            dataArray->changeInPlace(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
                         }
                         int32_t victimDataId = dataArray->preinsert(lineSize);
                         // Now we need to know the available space in this set
@@ -1023,12 +1023,12 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             // info("\t\tchanging LL pointer for old dataId at %i and decremented it's counter", dataId);
                             // Change Tag
                             uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
-                            dataArray->postinsert(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                            dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
                         } else {
                             // info("\t\tdecremented the counter at dataId %i", dataId);
                             uint32_t victimCounter = dataArray->readCounter(dataId, segmentId);
                             int32_t LLHead = dataArray->readListHead(dataId, segmentId);
-                            dataArray->postinsert(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
+                            dataArray->changeInPlace(LLHead, &req, victimCounter-1, dataId, segmentId, NULL, false);
                         }
                         int32_t victimDataId = dataArray->preinsert(lineSize);
 
