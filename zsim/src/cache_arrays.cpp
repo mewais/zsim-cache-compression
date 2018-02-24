@@ -1353,7 +1353,7 @@ void ApproximateDedupHashArray::postinsert(uint64_t hash, const MemReq* req, int
     rp->replaced(hashId);
     hashArray[hashId] = hash;
     dataPointerArray[hashId] = dataPointer;
-    if(updateReplacement) rp->update(hashId, req);
+    rp->update(hashId, req);
 }
 
 int32_t ApproximateDedupHashArray::readDataPointer(int32_t hashId) {
@@ -1909,14 +1909,14 @@ void ApproximateDedupBDIHashArray::postinsert(uint64_t hash, const MemReq* req, 
     hashArray[hashId] = hash;
     dataPointerArray[hashId] = dataPointer;
     segmentPointerArray[hashId] = segmentPointer;
-    if(updateReplacement) rp->update(hashId, req);
+    rp->update(hashId, req);
 }
 
 void ApproximateDedupBDIHashArray::changeInPlace(uint64_t hash, const MemReq* req, int32_t dataPointer, int32_t segmentPointer, int32_t hashId, bool updateReplacement) {
     hashArray[hashId] = hash;
     dataPointerArray[hashId] = dataPointer;
     segmentPointerArray[hashId] = segmentPointer;
-    if(updateReplacement) rp->update(hashId, req);
+    rp->update(hashId, req);
 }
 
 int32_t ApproximateDedupBDIHashArray::readDataPointer(int32_t hashId) {
