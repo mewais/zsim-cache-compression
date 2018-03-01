@@ -1159,6 +1159,19 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
     //         assert(singleSetCount <= dataAssoc*8);
     //     }
     // }
+
+    // uint32_t count = 0;
+    // for (int32_t i = 0; i < (signed)(numDataLines/dataAssoc); i++) {
+    //     for (int32_t j = 0; j < (signed)dataAssoc*8; j++) {
+    //         if (dataArray->readListHead(i, j) == -1)
+    //             continue;
+    //         count += dataArray->readCounter(i, j);
+    //         int32_t tagId = dataArray->readListHead(i, j);
+    //         assert(tagArray->readDataId(tagId) == i && tagArray->readSegmentPointer(tagId) == j);
+    //     }
+    // }
+    // assert(count == tagArray->getValidLines());
+
     // info("Valid Tags: %u", tagArray->getValidLines());
     // info("Valid Segments: %u", tagArray->getDataValidSegments());
     // assert(tagArray->getValidLines() == tagArray->countValidLines());

@@ -755,6 +755,16 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
     }
     cc->endAccess(req);
 
+    // uint32_t count = 0;
+    // for (int32_t i = 0; i < (signed)numDataLines; i++) {
+    //     if (dataArray->readListHead(i) == -1)
+    //         continue;
+    //     count += dataArray->readCounter(i);
+    //     int32_t tagId = dataArray->readListHead(i);
+    //     assert(tagArray->readDataId(tagId) == i);
+    // }
+    // assert(count == tagArray->getValidLines());
+
     // info("Valid Tags: %u", tagArray->getValidLines());
     // info("Valid Lines: %u", dataArray->getValidLines());
     assert(tagArray->getValidLines() == tagArray->countValidLines());
