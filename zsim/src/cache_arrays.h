@@ -343,7 +343,7 @@ class ApproximateDedupBDITagArray {
         // LinkedList Head to pointed to from the data array.
         bool evictAssociatedData(int32_t lineId, int32_t* newLLHead);
         // Actually inserts
-        void postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t segmentId, BDICompressionEncoding encoding, int32_t listHead, bool updateReplacement);
+        void postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t segmentId, BDICompressionEncoding encoding, int32_t listHead, bool updateReplacement, bool replace = true);
         void changeInPlace(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t segmentId, BDICompressionEncoding encoding, int32_t listHead, bool updateReplacement);
         // returns compressionEncoding
         BDICompressionEncoding readCompressionEncoding(int32_t tagId);

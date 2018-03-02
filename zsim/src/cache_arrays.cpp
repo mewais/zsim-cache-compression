@@ -1505,7 +1505,7 @@ bool ApproximateDedupBDITagArray::evictAssociatedData(int32_t lineId, int32_t* n
     return true;
 }
 
-void ApproximateDedupBDITagArray::postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t segmentId, BDICompressionEncoding encoding, int32_t listHead, bool updateReplacement) {
+void ApproximateDedupBDITagArray::postinsert(Address lineAddr, const MemReq* req, int32_t tagId, int32_t dataId, int32_t segmentId, BDICompressionEncoding encoding, int32_t listHead, bool updateReplacement, bool replace) {
     // info("Tag was %i: %lu, %i, %i, %i, %i, %i", tagId, tagArray[tagId] << lineBits, prevPointerArray[tagId], nextPointerArray[tagId], dataPointerArray[tagId], segmentPointerArray[tagId], BDICompressionToSize(compressionEncodingArray[tagId], zinfo->lineSize));
     // if (prevPointerArray[tagId] != -1)
     //     info("Tag was %i: %lu, %i, %i, %i, %i, %i", prevPointerArray[tagId], tagArray[prevPointerArray[tagId]] << lineBits, prevPointerArray[prevPointerArray[tagId]], nextPointerArray[prevPointerArray[tagId]], dataPointerArray[prevPointerArray[tagId]], segmentPointerArray[prevPointerArray[tagId]], BDICompressionToSize(compressionEncodingArray[prevPointerArray[tagId]], zinfo->lineSize));
@@ -1527,7 +1527,7 @@ void ApproximateDedupBDITagArray::postinsert(Address lineAddr, const MemReq* req
     } else if (tagArray[tagId] && (nextPointerArray[tagId] > -1 || prevPointerArray[tagId] > -1) && lineAddr && listHead == -1) {
         dataValidSegments+=BDICompressionToSize(encoding, zinfo->lineSize)/8;
     }
-    rp->replaced(tagId);
+    if(replace) rp->replaced(tagId);
     tagArray[tagId] = lineAddr;
     dataPointerArray[tagId] = dataId;
     segmentPointerArray[tagId] = segmentId;

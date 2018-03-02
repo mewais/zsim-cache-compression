@@ -540,7 +540,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             // // info("\t\tAlong with dataId: %i", dataId);
                             // Clear (Evict, Tags already evicted) data line
                             dataArray->postinsert(-1, &req, 0, dataId, segmentId, NULL, false);
-                            tagArray->postinsert(0, &req, tagId, -1, -1, NONE, -1, false);
+                            tagArray->postinsert(0, &req, tagId, -1, -1, NONE, -1, false, false);
                         } else if (newLLHead != -1) {
                             // Change Tag
                             // info("\t\tchanging LL pointer for old dataId at %i and decremented it's counter", dataId);
@@ -612,7 +612,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         } while (freeSpace < lineSize);
                         respCycle = lastEvDoneCycle;
                         // // // info("SHOULD UP");
-                        tagArray->postinsert(req.lineAddr, &req, tagId, targetDataId, keptFromEvictions[0], encoding, -1, updateReplacement);
+                        tagArray->postinsert(req.lineAddr, &req, tagId, targetDataId, keptFromEvictions[0], encoding, -1, updateReplacement, false);
                         // // info("postinsert %i", tagId);
                         dataArray->postinsert(tagId, &req, 1, targetDataId, keptFromEvictions[0], data, updateReplacement);
                         hashArray->postinsert(hash, &req, targetDataId, keptFromEvictions[0], hashId, updateReplacement);
@@ -651,7 +651,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             // // info("\t\tAlong with dataId: %i", dataId);
                             // Clear (Evict, Tags already evicted) data line
                             dataArray->postinsert(-1, &req, 0, dataId, segmentId, NULL, false);
-                            tagArray->postinsert(0, &req, tagId, -1, -1, NONE, -1, false);
+                            tagArray->postinsert(0, &req, tagId, -1, -1, NONE, -1, false, false);
                         } else if (newLLHead != -1) {
                             // info("\t\tchanging LL pointer for old dataId at %i and decremented it's counter", dataId);
                             // Change Tag
@@ -695,7 +695,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 // // info("\t\tAlong with dataId: %i", dataId);
                                 // Clear (Evict, Tags already evicted) data line
                                 dataArray->postinsert(-1, &req, 0, dataId, segmentId, NULL, false);
-                                tagArray->postinsert(0, &req, tagId, -1, -1, NONE, -1, false);
+                                tagArray->postinsert(0, &req, tagId, -1, -1, NONE, -1, false, false);
                             } else if (newLLHead != -1) {
                                 // info("\t\tchanging LL pointer for old dataId at %i and decremented it's counter", dataId);
                                 // Change Tag
@@ -765,7 +765,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             } while (freeSpace < lineSize);
                             respCycle = lastEvDoneCycle;
                             // // // info("SHOULD CHANGE");
-                            tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement);
+                            tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement, false);
                             dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data, updateReplacement);
                             if (dataArray->readCounter(targetDataId, targetSegmentId) == 1)
                                 hashArray->postinsert(hash, &req, victimDataId, keptFromEvictions[0], hashId, updateReplacement);
@@ -870,7 +870,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             } while (freeSpace < lineSize);
                             respCycle = lastEvDoneCycle;
                             // // // info("SHOULD UP");
-                            tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement);
+                            tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement, false);
                             // // info("postinsert %i", tagId);
                             dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data, updateReplacement);
                             if (dataArray->readCounter(targetDataId, targetSegmentId) == 1)
@@ -915,7 +915,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             // // info("\t\tAlong with dataId: %i", dataId);
                             // Clear (Evict, Tags already evicted) data line
                             dataArray->postinsert(-1, &req, 0, dataId, segmentId, NULL, false);
-                            tagArray->postinsert(0, &req, tagId, -1, -1, NONE, -1, false);
+                            tagArray->postinsert(0, &req, tagId, -1, -1, NONE, -1, false, false);
                         } else if (newLLHead != -1) {
                             // info("\t\tchanging LL pointer for old dataId at %i and decremented it's counter", dataId);
                             // Change Tag
@@ -985,7 +985,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         } while (freeSpace < lineSize);
                         respCycle = lastEvDoneCycle;
                         // // // info("SHOULD CHANGE");
-                        tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement);
+                        tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement, false);
                         dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data, updateReplacement);
                         hashId = hashArray->preinsert(hash, &req);
                         if (hashId != -1)
@@ -1091,7 +1091,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         } while (freeSpace < lineSize);
                         respCycle = lastEvDoneCycle;
                         // // // info("SHOULD UP");
-                        tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement);
+                        tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement, false);
                         // // info("postinsert %i", tagId);
                         dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data, updateReplacement);
                         hashId = hashArray->preinsert(hash, &req);
