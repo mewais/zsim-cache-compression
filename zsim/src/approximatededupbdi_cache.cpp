@@ -22,7 +22,6 @@ numDataLines(_numDataLines), dataAssoc(ways), tagArray(_tagArray), dataArray(_da
     dupStats = new RunningStats(statName);
     statName = name + g_string(" Data Size Average");
     bdiStats = new RunningStats(statName);
-
 }
 
 void ApproximateDedupBDICache::initStats(AggregateStat* parentStat) {
