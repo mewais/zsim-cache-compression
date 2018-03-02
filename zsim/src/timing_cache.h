@@ -64,6 +64,7 @@ class TimingCache : public Cache {
                 uint32_t tagLat, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name, RunningStats* _evStats, Counter* _tag_hits, Counter* _tag_misses, Counter* _tag_all);
         void initStats(AggregateStat* parentStat);
 
+        virtual void dumpStats() {}
         uint64_t access(MemReq& req);
 
         void simulateHit(HitEvent* ev, uint64_t cycle);

@@ -37,6 +37,7 @@
 
 #include <tuple>
 
+class Cache;
 class Counter;
 class Core;
 class Scheduler;
@@ -149,6 +150,7 @@ struct GlobSimInfo {
     g_vector<Counter*>* tagHitStats;
     g_vector<Counter*>* tagMissStats;
     g_vector<Counter*>* tagAllStats;
+    g_vector<Cache*>* L3Cache;
     StatsBackend* periodicStatsBackend;
     StatsBackend* eventualStatsBackend;
     ProcessStats* processStats;

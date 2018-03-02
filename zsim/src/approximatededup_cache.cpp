@@ -6,6 +6,20 @@ ReplPolicy* dataRP, ReplPolicy* hashRP, uint32_t _accLat, uint32_t _invLat, uint
 RunningStats* _evStats, RunningStats* _tutStats, RunningStats* _dutStats, Counter* _tag_hits, Counter* _tag_misses, Counter* _tag_all) : TimingCache(_numTagLines, _cc, NULL, tagRP, _accLat, _invLat, mshrs, tagLat, ways, cands, _domain, _name, _evStats, _tag_hits, _tag_misses, _tag_all), numTagLines(_numTagLines),
 numDataLines(_numDataLines), tagArray(_tagArray), dataArray(_dataArray), hashArray(_hashArray), tagRP(tagRP), dataRP(dataRP), hashRP(hashRP), crStats(_crStats), evStats(_evStats), tutStats(_tutStats), dutStats(_dutStats) {
     hashArray->registerDataArray(dataArray);
+    TM_HM = 0;
+    TM_HH_DI = 0;
+    TM_HH_DS = 0;
+    TM_HH_DD = 0;
+    WD_TH_HM_1 = 0;
+    WD_TH_HM_M = 0;
+    WD_TH_HH_DI = 0;
+    WD_TH_HH_DS = 0;
+    WD_TH_HH_DD_1 = 0;
+    WD_TH_HH_DD_M = 0;
+    WSR_TH = 0;
+    g_string statName = name + g_string(" Deduplication Average");
+    dupStats = new RunningStats(statName);
+
 }
 
 void ApproximateDedupCache::initStats(AggregateStat* parentStat) {
@@ -793,6 +807,9 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
     sample = (double)tagArray->getValidLines()/numTagLines;
     tutStats->add(sample, 1);
 
+    sample = (double)tagArray->getValidLines()/dataArray->getValidLines();
+    dupStats->add(sample, 1);
+
     assert_msg(respCycle >= req.cycle, "[%s] resp < req? 0x%lx type %s childState %s, respCycle %ld reqCycle %ld",
             name.c_str(), req.lineAddr, AccessTypeName(req.type), MESIStateName(*req.state), respCycle, req.cycle);
     return respCycle;
@@ -812,4 +829,19 @@ void ApproximateDedupCache::simulateHitWriteback(dHitWritebackEvent* ev, uint64_
     } else {
         ev->requeue(cycle+1);
     }
+}
+
+void ApproximateDedupCache::dumpStats() {
+    info("TM_HM: %lu", TM_HM);
+    info("TM_HH_DI: %lu", TM_HH_DI);
+    info("TM_HH_DS: %lu", TM_HH_DS);
+    info("TM_HH_DD: %lu", TM_HH_DD);
+    info("WD_TH_HM_1: %lu", WD_TH_HM_1);
+    info("WD_TH_HM_M: %lu", WD_TH_HM_M);
+    info("WD_TH_HH_DI: %lu", WD_TH_HH_DI);
+    info("WD_TH_HH_DS: %lu", WD_TH_HH_DS);
+    info("WD_TH_HH_DD_1: %lu", WD_TH_HH_DD_1);
+    info("WD_TH_HH_DD_M: %lu", WD_TH_HH_DD_M);
+    info("WSR_TH: %lu", WSR_TH);
+    dupStats->dump();
 }

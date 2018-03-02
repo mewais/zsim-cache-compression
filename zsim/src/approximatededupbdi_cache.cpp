@@ -7,6 +7,22 @@ RunningStats* _evStats, RunningStats* _tutStats, RunningStats* _dutStats, Counte
 numDataLines(_numDataLines), dataAssoc(ways), tagArray(_tagArray), dataArray(_dataArray), hashArray(_hashArray), tagRP(tagRP), dataRP(dataRP), hashRP(hashRP), crStats(_crStats), evStats(_evStats), tutStats(_tutStats), dutStats(_dutStats) {
     dataArray->assignTagArray(tagArray);
     hashArray->registerDataArray(dataArray);
+    TM_HM = 0;
+    TM_HH_DI = 0;
+    TM_HH_DS = 0;
+    TM_HH_DD = 0;
+    WD_TH_HM_1 = 0;
+    WD_TH_HM_M = 0;
+    WD_TH_HH_DI = 0;
+    WD_TH_HH_DS = 0;
+    WD_TH_HH_DD_1 = 0;
+    WD_TH_HH_DD_M = 0;
+    WSR_TH = 0;
+    g_string statName = name + g_string(" Deduplication Average");
+    dupStats = new RunningStats(statName);
+    statName = name + g_string(" Data Size Average");
+    bdiStats = new RunningStats(statName);
+
 }
 
 void ApproximateDedupBDICache::initStats(AggregateStat* parentStat) {
@@ -1197,6 +1213,21 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
     sample = (double)tagArray->getValidLines()/numTagLines;
     tutStats->add(sample, 1);
 
+    uint32_t compressedLineCount = 0;
+    for (uint32_t i = 0; i < numDataLines/dataAssoc; i++) {
+        for (uint32_t j = 0; j < dataAssoc*8; j++) {
+            if(dataArray->readListHead(i, j) != -1) {
+                compressedLineCount++;
+            }
+        }
+    }
+
+    sample = (double)tagArray->getValidLines()/compressedLineCount;
+    dupStats->add(sample, 1);
+
+    sample = (double)tagArray->getDataValidSegments()/compressedLineCount;
+    bdiStats->add(sample, 1);
+
     assert_msg(respCycle >= req.cycle, "[%s] resp < req? 0x%lx type %s childState %s, respCycle %ld reqCycle %ld",
             name.c_str(), req.lineAddr, AccessTypeName(req.type), MESIStateName(*req.state), respCycle, req.cycle);
     return respCycle;
@@ -1216,4 +1247,20 @@ void ApproximateDedupBDICache::simulateHitWriteback(dbHitWritebackEvent* ev, uin
     } else {
         ev->requeue(cycle+1);
     }
+}
+
+void ApproximateDedupBDICache::dumpStats() {
+    info("TM_HM: %lu", TM_HM);
+    info("TM_HH_DI: %lu", TM_HH_DI);
+    info("TM_HH_DS: %lu", TM_HH_DS);
+    info("TM_HH_DD: %lu", TM_HH_DD);
+    info("WD_TH_HM_1: %lu", WD_TH_HM_1);
+    info("WD_TH_HM_M: %lu", WD_TH_HM_M);
+    info("WD_TH_HH_DI: %lu", WD_TH_HH_DI);
+    info("WD_TH_HH_DS: %lu", WD_TH_HH_DS);
+    info("WD_TH_HH_DD_1: %lu", WD_TH_HH_DD_1);
+    info("WD_TH_HH_DD_M: %lu", WD_TH_HH_DD_M);
+    info("WSR_TH: %lu", WSR_TH);
+    dupStats->dump();
+    bdiStats->dump();
 }

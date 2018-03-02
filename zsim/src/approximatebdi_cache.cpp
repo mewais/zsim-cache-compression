@@ -5,7 +5,10 @@ ApproximateBDICache::ApproximateBDICache(uint32_t _numTagLines, uint32_t _numDat
 ReplPolicy* tagRP, ReplPolicy* dataRP, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name,
 RunningStats* _crStats, RunningStats* _evStats, RunningStats* _tutStats, RunningStats* _dutStats, Counter* _tag_hits, Counter* _tag_misses, Counter* _tag_all) : TimingCache(_numTagLines, _cc, NULL, tagRP,
 _accLat, _invLat, mshrs, tagLat, ways, cands, _domain, _name, _evStats, _tag_hits, _tag_misses, _tag_all), numTagLines(_numTagLines), numDataLines(_numDataLines), tagArray(_tagArray), tagRP(tagRP), crStats(_crStats),
-evStats(_evStats), tutStats(_tutStats), dutStats(_dutStats) {}
+evStats(_evStats), tutStats(_tutStats), dutStats(_dutStats) {
+    g_string statName = name + g_string(" Data Size Average");
+    bdiStats = new RunningStats(statName);
+}
 
 void ApproximateBDICache::initStats(AggregateStat* parentStat) {
     AggregateStat* cacheStat = new AggregateStat();
@@ -349,6 +352,9 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
     sample = (double)tagArray->getValidLines()/numTagLines;
     tutStats->add(sample, 1);
 
+    sample = (double)tagArray->getDataValidSegments()/tagArray->getValidLines();
+    bdiStats->add(sample, 1);
+
     assert_msg(respCycle >= req.cycle, "[%s] resp < req? 0x%lx type %s childState %s, respCycle %ld reqCycle %ld",
             name.c_str(), req.lineAddr, AccessTypeName(req.type), MESIStateName(*req.state), respCycle, req.cycle);
     return respCycle;
@@ -368,4 +374,8 @@ void ApproximateBDICache::simulateHitWriteback(aHitWritebackEvent* ev, uint64_t 
     } else {
         ev->requeue(cycle+1);
     }
+}
+
+void ApproximateBDICache::dumpStats() {
+    bdiStats->dump();
 }

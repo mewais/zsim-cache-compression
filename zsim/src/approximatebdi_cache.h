@@ -22,12 +22,14 @@ class ApproximateBDICache : public TimingCache {
         RunningStats* evStats;
         RunningStats* tutStats;
         RunningStats* dutStats;
+        RunningStats* bdiStats;
 
     public:
         ApproximateBDICache(uint32_t _numTagLines, uint32_t _numDataLines, CC* _cc, ApproximateBDITagArray* _tagArray, ApproximateBDIDataArray* _dataArray, ReplPolicy* tagRP, ReplPolicy* dataRP, uint32_t _accLat, uint32_t _invLat,
                         uint32_t mshrs, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name, RunningStats* _crStats, RunningStats* _evStats, RunningStats* _tutStats, RunningStats* _dutStats, Counter* _tag_hits, Counter* _tag_misses, Counter* _tag_all);
 
         uint64_t access(MemReq& req);
+        void dumpStats();
 
         void initStats(AggregateStat* parentStat);
         void simulateHitWriteback(aHitWritebackEvent* ev, uint64_t cycle, HitEvent* he);

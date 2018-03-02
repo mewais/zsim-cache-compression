@@ -24,6 +24,19 @@ class ApproximateDedupCache : public TimingCache {
         RunningStats* evStats;
         RunningStats* tutStats;
         RunningStats* dutStats;
+        RunningStats* dupStats;
+
+        uint64_t TM_HM;
+        uint64_t TM_HH_DI;
+        uint64_t TM_HH_DS;
+        uint64_t TM_HH_DD;
+        uint64_t WD_TH_HM_1;
+        uint64_t WD_TH_HM_M;
+        uint64_t WD_TH_HH_DI;
+        uint64_t WD_TH_HH_DS;
+        uint64_t WD_TH_HH_DD_1;
+        uint64_t WD_TH_HH_DD_M;
+        uint64_t WSR_TH;
 
     public:
         ApproximateDedupCache(uint32_t _numTagLines, uint32_t _numDataLines, CC* _cc, ApproximateDedupTagArray* _tagArray, ApproximateDedupDataArray* _dataArray, ApproximateDedupHashArray* _hashArray, ReplPolicy* tagRP, 
@@ -31,6 +44,7 @@ class ApproximateDedupCache : public TimingCache {
                         RunningStats* _evStats, RunningStats* _tutStats, RunningStats* _dutStats, Counter* _tag_hits, Counter* _tag_misses, Counter* _tag_all);
 
         uint64_t access(MemReq& req);
+        void dumpStats();
 
         void initStats(AggregateStat* parentStat);
         void simulateHitWriteback(dHitWritebackEvent* ev, uint64_t cycle, HitEvent* he);

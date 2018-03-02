@@ -41,6 +41,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include "access_tracing.h"
+#include "cache.h"
 #include "constants.h"
 #include "contention_sim.h"
 #include "core.h"
@@ -1208,6 +1209,7 @@ VOID SimEnd() {
         for(uint32_t i = 0; i < zinfo->tagHitStats->size(); i++) (*zinfo->tagHitStats)[i]->dump();
         for(uint32_t i = 0; i < zinfo->tagMissStats->size(); i++) (*zinfo->tagMissStats)[i]->dump();
         for(uint32_t i = 0; i < zinfo->tagAllStats->size(); i++) (*zinfo->tagAllStats)[i]->dump();
+        for(uint32_t i = 0; i < zinfo->L3Cache->size(); i++) (*zinfo->L3Cache)[i]->dumpStats();
     }
 
     //Uncomment when debugging termination races, which can be rare because they are triggered by threads of a dying process
