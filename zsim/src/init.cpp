@@ -95,6 +95,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
     if (!zinfo->tagHitStats) zinfo->tagHitStats = new g_vector<Counter*>();
     if (!zinfo->tagMissStats) zinfo->tagMissStats = new g_vector<Counter*>();
     if (!zinfo->tagAllStats) zinfo->tagAllStats = new g_vector<Counter*>();
+    if (!zinfo->L3Cache) zinfo->L3Cache = new g_vector<Cache*>();
     string type = config.get<const char*>(prefix + "type", "Simple");
 
     // Shortcut for TraceDriven type
@@ -371,6 +372,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             zinfo->tagHitStats->push_back(hitStats);
             zinfo->tagMissStats->push_back(missStats);
             zinfo->tagAllStats->push_back(allStats);
+            zinfo->L3Cache->push_back(cache);
         } else if (type == "uniDoppelgangerBDI") {
             g_string statName = name + g_string(" CompressionRatio");
             RunningStats* crStats = new RunningStats(statName);
@@ -393,6 +395,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             zinfo->tagHitStats->push_back(hitStats);
             zinfo->tagMissStats->push_back(missStats);
             zinfo->tagAllStats->push_back(allStats);
+            zinfo->L3Cache->push_back(cache);
         } else if (type == "ApproximateBDI") {
             g_string statName = name + g_string(" CompressionRatio");
             RunningStats* crStats = new RunningStats(statName);
@@ -415,6 +418,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             zinfo->tagHitStats->push_back(hitStats);
             zinfo->tagMissStats->push_back(missStats);
             zinfo->tagAllStats->push_back(allStats);
+            zinfo->L3Cache->push_back(cache);
         } else if (type == "ApproximateDedup") {
             g_string statName = name + g_string(" CompressionRatio");
             RunningStats* crStats = new RunningStats(statName);
@@ -437,6 +441,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             zinfo->tagHitStats->push_back(hitStats);
             zinfo->tagMissStats->push_back(missStats);
             zinfo->tagAllStats->push_back(allStats);
+            zinfo->L3Cache->push_back(cache);
         } else if (type == "ApproximateDedupBDI") {
             g_string statName = name + g_string(" CompressionRatio");
             RunningStats* crStats = new RunningStats(statName);
@@ -459,6 +464,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             zinfo->tagHitStats->push_back(hitStats);
             zinfo->tagMissStats->push_back(missStats);
             zinfo->tagAllStats->push_back(allStats);
+            zinfo->L3Cache->push_back(cache);
         } else if (type == "Timing") {
             g_string statName = name + g_string(" EvictionsPerAccess");
             RunningStats* evStats = new RunningStats(statName);
@@ -470,6 +476,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             zinfo->tagMissStats->push_back(missStats);
             zinfo->tagAllStats->push_back(allStats);
             zinfo->evictionStats->push_back(evStats);
+            zinfo->L3Cache->push_back(cache);
         } else if (type == "Tracing") {
             g_string traceFile = config.get<const char*>(prefix + "traceFile","");
             if (traceFile.empty()) traceFile = g_string(zinfo->outputDir) + "/" + name + ".trace";
