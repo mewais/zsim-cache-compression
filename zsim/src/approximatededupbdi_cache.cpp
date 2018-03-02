@@ -205,6 +205,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                 int32_t segmentId = hashArray->readSegmentPointer(hashId);
                 evictCycle = respCycle;
                 if(dataId >= 0 && dataArray->readListHead(dataId, segmentId) == -1) {
+                    TM_HH_DI++;
                     // // info("Data line was evicted before. Taking over.");
                     // info("\t\tFound matching hash pointing to invalid line, taking over.");
                     uint16_t freeSpace = 0;
@@ -295,6 +296,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         connect(tagWritebackRecord.isValid()? &tagWritebackRecord : nullptr, mse, mwe, req.cycle + accLat, tagEvDoneCycle);
                     }
                 } else if (dataId >= 0 && dataArray->isSame(dataId, segmentId, data)) {
+                    TM_HH_DS++;
                     // info("\t\tfound matching data at %i.", dataId);
                     // // info("Data is also similar.");
                     int32_t oldListHead = dataArray->readListHead(dataId, segmentId);
@@ -327,6 +329,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         connect(tagWritebackRecord.isValid()? &tagWritebackRecord : nullptr, mse, mwe, req.cycle + accLat, tagEvDoneCycle);
                     }
                 } else {
+                    TM_HH_DD++;
                     // info("\t\tFound matching hash but different data, collision.");
                     // // info("Data is different, Collision.");
                     // Select data to evict
@@ -424,6 +427,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     }
                 }
             } else {
+                TM_HM++;
                 // info("\t\tCouldn't find matching hash.");
                 // // info("Hash is different, nothing similar.");
                 // Select data to evict
@@ -548,6 +552,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     int32_t targetDataId = hashArray->readDataPointer(hashId);
                     int32_t targetSegmentId = hashArray->readSegmentPointer(hashId);
                     if(targetDataId >= 0 && targetSegmentId >= 0 && dataArray->readListHead(targetDataId, targetSegmentId) == -1) {
+                        WD_TH_HH_DI++;
                         // info("\t\tFound matching hash pointing to invalid line, taking over.");
                         int32_t newLLHead;
                         bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead);
@@ -658,6 +663,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         he->addChild(hwe, evRec);
                         tr.startEvent = tr.endEvent = he;
                     } else if (targetDataId >= 0 && targetSegmentId >= 0 && dataArray->isSame(targetDataId, targetSegmentId, data)) {
+                        WD_TH_HH_DS++;
                         // info("\t\tFound matching data at %i.", targetDataId);
                         respCycle += accLat;
                         int32_t newLLHead;
@@ -702,6 +708,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         dataId = tagArray->readDataId(tagId);
                         segmentId = tagArray->readSegmentPointer(tagId);
                         if (dataArray->readCounter(dataId, segmentId) == 1) {
+                            WD_TH_HH_DD_1++;
                             // Data only exists once, just update.
                             // // info("PUTX only once.");
                             int32_t newLLHead;
@@ -811,6 +818,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             he->addChild(hwe, evRec);
                             tr.startEvent = tr.endEvent = he;
                         } else {
+                            WD_TH_HH_DD_M++;
                             // Data exists more than once, evict from LL.
                             // // info("PUTX more than once");
                             int32_t newLLHead;
@@ -922,6 +930,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                 } else {
                     // info("\t\tCouldn't find a matching hash.");
                     if (dataArray->readCounter(dataId, segmentId) == 1) {
+                        WD_TH_HM_1++;
                         // Data only exists once, just update.
                         // // info("PUTX only once.");
                         int32_t newLLHead;
@@ -1032,6 +1041,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         he->addChild(hwe, evRec);
                         tr.startEvent = tr.endEvent = he;
                     } else {
+                        WD_TH_HM_M++;
                         // Data exists more than once, evict from LL.
                         // // info("PUTX more than once");
                         int32_t newLLHead;
@@ -1142,6 +1152,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     }
                 }
             } else {
+                WSR_TH++;
                 // info("\tHit Req");
                 dataArray->lookup(tagArray->readDataId(tagId), tagArray->readSegmentPointer(tagId), &req, updateReplacement);
                 respCycle += accLat;

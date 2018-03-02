@@ -19,7 +19,6 @@ numDataLines(_numDataLines), tagArray(_tagArray), dataArray(_dataArray), hashArr
     WSR_TH = 0;
     g_string statName = name + g_string(" Deduplication Average");
     dupStats = new RunningStats(statName);
-
 }
 
 void ApproximateDedupCache::initStats(AggregateStat* parentStat) {
@@ -192,6 +191,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                 // // info("Found a matching hash, proceeding to match the full line.");
                 int32_t dataId = hashArray->readDataPointer(hashId);
                 if(dataId >= 0 && dataArray->readListHead(dataId) == -1) {
+                    TM_HH_DI++;
                     // info("\t\tFound matching hash pointing to invalid line, taking over.");
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, dataId, -1, true, true);
                     // // info("postinsert %i", victimTagId);
@@ -227,6 +227,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         connect(tagWritebackRecord.isValid()? &tagWritebackRecord : nullptr, mse, mwe, req.cycle + accLat, tagEvDoneCycle);
                     }
                 } else if (dataId >= 0 && dataArray->isSame(dataId, data)) {
+                    TM_HH_DS++;
                     // info("\t\tfound matching data at %i.", dataId);
                     int32_t oldListHead = dataArray->readListHead(dataId);
                     // // info("With a list head at %i", oldListHead);
@@ -258,6 +259,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         connect(tagWritebackRecord.isValid()? &tagWritebackRecord : nullptr, mse, mwe, req.cycle + accLat, tagEvDoneCycle);
                     }
                 } else {
+                    TM_HH_DD++;
                     // info("\t\tFound matching hash but different data, collision.");
                     // Select data to evict
                     evictCycle = respCycle + 2*accLat;
@@ -328,6 +330,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                     }
                 }
             } else {
+                TM_HM++;
                 // info("\t\tCouldn't find matching hash.");
                 // Select data to evict
                 evictCycle = respCycle + accLat;
@@ -416,6 +419,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                     // // info("Found a matching hash, proceeding to match the full line.");
                     int32_t targetDataId = hashArray->readDataPointer(hashId);
                     if(targetDataId >= 0 && dataArray->readListHead(targetDataId) == -1) {
+                        WD_TH_HH_DI++;
                         // info("\t\tFound matching hash pointing to invalid line, taking over.");
                         bool approximateVictim;
                         int32_t newLLHead;
@@ -470,6 +474,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         he->addChild(hwe, evRec);
                         tr.startEvent = tr.endEvent = he;
                     } else if (targetDataId >= 0 && dataArray->isSame(targetDataId, data)) {
+                        WD_TH_HH_DS++;
                         // info("\t\tFound matching data at %i.", targetDataId);
                         // // info("Data is also similar to %i.", targetDataId);
                         bool approximateVictim;
@@ -530,6 +535,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                     } else {
                         // info("\t\tFound matching hash pointing to a different line, collision.");
                         if (dataArray->readCounter(dataId) == 1) {
+                            WD_TH_HH_DD_1++;
                             // Data only exists once, just update.
                             // info("\t\tOnly had one tag. Overwriting self instead of picking random data victim.");
                             dataArray->writeData(dataId, data, &req, true);
@@ -545,6 +551,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             ev->setMinStartCycle(req.cycle);
                             tr.startEvent = tr.endEvent = ev;
                         } else {
+                            WD_TH_HH_DD_M++;
                             // Data exists more than once, evict from LL.
                             // // info("PUTX more than once");
                             bool approximateVictim;
@@ -641,6 +648,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                 } else {
                     // info("\t\tCouldn't find a matching hash.");
                     if (dataArray->readCounter(dataId) == 1) {
+                        WD_TH_HM_1++;
                         // info("\t\tOnly had one tag. Overwriting self instead of picking random data victim.");
                         // Data only exists once, just update.
                         // // info("PUTX only once.");
@@ -658,6 +666,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         ev->setMinStartCycle(req.cycle);
                         tr.startEvent = tr.endEvent = ev;
                     } else {
+                        WD_TH_HM_M++;
                         // Data exists more than once, evict from LL.
                         // // info("PUTX more than once");
                         bool approximateVictim;
@@ -752,8 +761,8 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         tr.startEvent = tr.endEvent = he;
                     }
                 }
-
             } else {
+                WSR_TH++;
                 // info("\tTag Hit");
                 dataArray->lookup(tagArray->readDataId(tagId), &req, updateReplacement);
                 uint64_t getDoneCycle = respCycle;
