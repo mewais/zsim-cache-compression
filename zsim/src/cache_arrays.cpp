@@ -1328,6 +1328,10 @@ ApproximateDedupHashArray::~ApproximateDedupHashArray() {
     gm_free(dataPointerArray);
 }
 
+void ApproximateDedupHashArray::registerDataArray(ApproximateDedupDataArray* dataArray) {
+    this->dataArray = dataArray;
+}
+
 int32_t ApproximateDedupHashArray::lookup(uint64_t hash, const MemReq* req, bool updateReplacement) {
     uint32_t set = hf->hash(0, hash) & setMask;
     uint32_t first = set*assoc;
@@ -1344,9 +1348,17 @@ int32_t ApproximateDedupHashArray::preinsert(uint64_t hash, const MemReq* req) {
     uint32_t set = hf->hash(0, hash) & setMask;
     uint32_t first = set*assoc;
 
-    uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc));
+    // uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc));
+    for (uint32_t i = first; i < first+assoc; i++) {
+        if (dataPointerArray[i] == -1) {
+            return i;
+        }
+        if (dataArray->readCounter(dataPointerArray[i]) <= 1) {
+            return i;
+        }
+    }
 
-    return candidate;
+    return -1;
 }
 
 void ApproximateDedupHashArray::postinsert(uint64_t hash, const MemReq* req, int32_t dataPointer, int32_t hashId, bool updateReplacement) {
@@ -1883,6 +1895,10 @@ ApproximateDedupBDIHashArray::~ApproximateDedupBDIHashArray() {
     gm_free(segmentPointerArray);
 }
 
+void ApproximateDedupBDIHashArray::registerDataArray(ApproximateDedupBDIDataArray* dataArray) {
+    this->dataArray = dataArray;
+}
+
 int32_t ApproximateDedupBDIHashArray::lookup(uint64_t hash, const MemReq* req, bool updateReplacement) {
     uint32_t set = hf->hash(0, hash) & setMask;
     uint32_t first = set*assoc;
@@ -1899,9 +1915,18 @@ int32_t ApproximateDedupBDIHashArray::preinsert(uint64_t hash, const MemReq* req
     uint32_t set = hf->hash(0, hash) & setMask;
     uint32_t first = set*assoc;
 
-    uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc));
+    // uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc));
 
-    return candidate;
+    for (uint32_t i = first; i < first+assoc; i++) {
+        if (dataPointerArray[i] == -1) {
+            return i;
+        }
+        if (dataArray->readCounter(dataPointerArray[i], segmentPointerArray[i]) <= 1) {
+            return i;
+        }
+    }
+
+    return -1;
 }
 
 void ApproximateDedupBDIHashArray::postinsert(uint64_t hash, const MemReq* req, int32_t dataPointer, int32_t segmentPointer, int32_t hashId, bool updateReplacement) {

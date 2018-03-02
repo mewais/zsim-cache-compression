@@ -300,9 +300,11 @@ class ApproximateDedupHashArray {
         uint32_t numSets;
         uint32_t assoc;
         uint32_t setMask;
+        ApproximateDedupDataArray* dataArray;
     public:
         ApproximateDedupHashArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf, H3HashFamily* _dataHash);
         ~ApproximateDedupHashArray();
+        void registerDataArray(ApproximateDedupDataArray* dataArray);
         int32_t lookup(uint64_t hash, const MemReq* req, bool updateReplacement);
         int32_t preinsert(uint64_t hash, const MemReq* req);
         void postinsert(uint64_t hash, const MemReq* req, int32_t dataPointer, int32_t hashId, bool updateReplacement);
@@ -418,9 +420,11 @@ class ApproximateDedupBDIHashArray {
         uint32_t numSets;
         uint32_t assoc;
         uint32_t setMask;
+        ApproximateDedupBDIDataArray* dataArray;
     public:
         ApproximateDedupBDIHashArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf, H3HashFamily* _dataHash);
         ~ApproximateDedupBDIHashArray();
+        void registerDataArray(ApproximateDedupBDIDataArray* dataArray);
         int32_t lookup(uint64_t hash, const MemReq* req, bool updateReplacement);
         int32_t preinsert(uint64_t hash, const MemReq* req);
         void postinsert(uint64_t hash, const MemReq* req, int32_t dataPointer, int32_t segmentPointer, int32_t hashId, bool updateReplacement);
