@@ -1353,6 +1353,8 @@ int32_t ApproximateDedupHashArray::preinsert(uint64_t hash, const MemReq* req) {
         if (dataPointerArray[i] == -1) {
             return i;
         }
+    }
+    for (uint32_t i = first; i < first+assoc; i++) {
         if (dataArray->readCounter(dataPointerArray[i]) <= 1) {
             return i;
         }
@@ -1930,6 +1932,8 @@ int32_t ApproximateDedupBDIHashArray::preinsert(uint64_t hash, const MemReq* req
         if (dataPointerArray[i] == -1) {
             return i;
         }
+    }
+    for (uint32_t i = first; i < first+assoc; i++) {
         if (dataArray->readCounter(dataPointerArray[i], segmentPointerArray[i]) <= 1) {
             return i;
         }
