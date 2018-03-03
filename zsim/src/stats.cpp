@@ -62,3 +62,7 @@ void RunningStats::combineWith(const RunningStats &rhs) throw () {
 void RunningStats::dump() {
     info("%s: Min = %f, Mean = %f, Max = %f, StdDev = %f", this->name.c_str(), this->getMin(), this->getMean(), this->getMax(), this->getStdDev());
 }
+
+void RunningStats::dumpFile(std::ofstream* file) {
+    (*file) << this->name.c_str() << ": Min = " << this->getMin() << ", Mean = " << this->getMean() << ", Max = " << this->getMax() << "\n";
+}

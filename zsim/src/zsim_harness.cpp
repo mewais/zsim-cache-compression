@@ -224,6 +224,10 @@ static void printHeartbeat(GlobSimInfo* zinfo) {
     hb << " " << (cycles)/elapsedSecs << " cycles/s" << std::endl;
     hb << "Stats since last heartbeat (" << heartbeatSecs << "s):" << std:: endl;
     hb << " " << (cycles-lastCycles)/heartbeatSecs << " cycles/s" << std::endl;
+    hb << "Cache Stats:" << std::endl;
+    hb << " " << zinfo->tagHits << " tag hits" << std::endl;
+    hb << " " << zinfo->tagMisses << " tag misses" << std::endl;
+    hb << " " << zinfo->tagAll << " all tag accesses" << std::endl;
 
     lastHeartbeatTime = curTime;
     lastCycles = cycles;

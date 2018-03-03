@@ -79,6 +79,7 @@
 #include "g_std/g_vector.h"
 #include "g_std/g_string.h"
 #include "log.h"
+#include <fstream>
 
 class Stat : public GlobAlloc {
     protected:
@@ -259,6 +260,10 @@ class Counter : public ScalarStat {
         void dump() {
             info("%s: %lu", name.c_str(), _count);
         }
+
+        void dumpFile(std::ofstream* file) {
+            (*file) << name.c_str() << ": " << _count << "\n";
+        }
 };
 
 class VectorCounter : public VectorStat {
@@ -438,6 +443,7 @@ class RunningStats {
         void combineWith(const RunningStats &otherStats) throw();
         inline unsigned long long sampleCount()  { return numSamples; }
         void dump();
+        void dumpFile(std::ofstream* file);
     private:
         double minimum;
         double maximum;

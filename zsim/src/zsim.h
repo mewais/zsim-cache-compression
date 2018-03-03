@@ -208,6 +208,10 @@ struct GlobSimInfo {
     uint32_t randomLoopTrial;
     uint32_t doubleCutSize;
     uint16_t hashSize;
+
+    uint64_t tagHits;
+    uint64_t tagMisses;
+    uint64_t tagAll;
 };
 
 
