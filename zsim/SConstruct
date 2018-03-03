@@ -179,8 +179,8 @@ if GetOption('debugBuild'): buildTypes.append("debug")
 if GetOption('releaseBuild'): buildTypes.append("release")
 if GetOption('optBuild') or len(buildTypes) == 0: buildTypes.append("opt")
 
-march = "core2" # ensure compatibility across condor nodes
-#march = "native" # for profiling runs
+# march = "core2" # ensure compatibility across condor nodes
+march = "native" # for profiling runs
 
 buildFlags = {"debug": "-g -O0",
               "opt": "-march=%s -g -O3 -funroll-loops" % march, # unroll loops tends to help in zsim, but in general it can cause slowdown
