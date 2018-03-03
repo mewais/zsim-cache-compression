@@ -25,6 +25,7 @@ class ApproximateDedupBDICache : public TimingCache {
         RunningStats* evStats;
         RunningStats* tutStats;
         RunningStats* dutStats;
+        RunningStats* hutStats;
         RunningStats* dupStats;
         RunningStats* bdiStats;
 

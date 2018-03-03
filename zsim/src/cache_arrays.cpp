@@ -1428,6 +1428,15 @@ uint64_t ApproximateDedupHashArray::hash(const DataLine data)
     return XORs & ((uint64_t)std::pow(2, (zinfo->hashSize))-1);
 }
 
+uint32_t ApproximateDedupHashArray::countValidLines() {
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < this->numLines; i++) {
+        if (dataPointerArray[i] != -1)
+            count++;
+    }
+    return count;
+}
+
 void ApproximateDedupHashArray::print() {
     for (uint32_t i = 0; i < this->numLines; i++) {
         if (dataPointerArray[i] != -1)
@@ -2006,6 +2015,15 @@ uint64_t ApproximateDedupBDIHashArray::hash(const DataLine data)
     }
 
     return XORs & ((uint64_t)std::pow(2, (zinfo->hashSize))-1);
+}
+
+uint32_t ApproximateDedupBDIHashArray::countValidLines() {
+    uint32_t count = 0;
+    for (uint32_t i = 0; i < this->numLines; i++) {
+        if (dataPointerArray[i] != -1)
+            count++;
+    }
+    return count;
 }
 
 void ApproximateDedupBDIHashArray::print() {

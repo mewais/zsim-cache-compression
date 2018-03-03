@@ -311,6 +311,7 @@ class ApproximateDedupHashArray {
         int32_t readDataPointer(int32_t hashId);
         void approximate(const DataLine data, DataType type);
         uint64_t hash(const DataLine data);
+        uint32_t countValidLines();
         void print();
 };
 // Dedup End
@@ -433,6 +434,7 @@ class ApproximateDedupBDIHashArray {
         int32_t readSegmentPointer(int32_t hashId);
         void approximate(const DataLine data, DataType type);
         uint64_t hash(const DataLine data);
+        uint32_t countValidLines();
         void print();
 };
 // Dedup BDI End

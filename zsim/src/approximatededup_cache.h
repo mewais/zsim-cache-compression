@@ -24,6 +24,7 @@ class ApproximateDedupCache : public TimingCache {
         RunningStats* evStats;
         RunningStats* tutStats;
         RunningStats* dutStats;
+        RunningStats* hutStats;
         RunningStats* dupStats;
 
         uint64_t TM_HM;

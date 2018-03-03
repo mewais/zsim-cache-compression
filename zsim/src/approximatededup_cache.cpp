@@ -19,6 +19,8 @@ numDataLines(_numDataLines), tagArray(_tagArray), dataArray(_dataArray), hashArr
     WSR_TH = 0;
     g_string statName = name + g_string(" Deduplication Average");
     dupStats = new RunningStats(statName);
+    statName = name + g_string(" Hash Array Utilization");
+    hutStats = new RunningStats(statName);
 }
 
 void ApproximateDedupCache::initStats(AggregateStat* parentStat) {
@@ -819,6 +821,8 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
     sample = (double)tagArray->getValidLines()/dataArray->getValidLines();
     dupStats->add(sample, 1);
 
+    hutStats->add(hashArray->countValidLines(), 1);
+
     assert_msg(respCycle >= req.cycle, "[%s] resp < req? 0x%lx type %s childState %s, respCycle %ld reqCycle %ld",
             name.c_str(), req.lineAddr, AccessTypeName(req.type), MESIStateName(*req.state), respCycle, req.cycle);
     return respCycle;
@@ -852,5 +856,6 @@ void ApproximateDedupCache::dumpStats() {
     info("WD_TH_HH_DD_1: %lu", WD_TH_HH_DD_1);
     info("WD_TH_HH_DD_M: %lu", WD_TH_HH_DD_M);
     info("WSR_TH: %lu", WSR_TH);
+    hutStats->dump();
     dupStats->dump();
 }
