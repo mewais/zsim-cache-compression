@@ -46,6 +46,8 @@
 #include "approximatebdi_cache.h"
 #include "approximatededup_cache.h"
 #include "approximatededupbdi_cache.h"
+#include "approximateidealdedup_cache.h"
+#include "approximateidealdedupbdi_cache.h"
 #include "dramsim_mem_ctrl.h"
 #include "event_queue.h"
 #include "filter_cache.h"
@@ -442,6 +444,29 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             zinfo->tagMissStats->push_back(missStats);
             zinfo->tagAllStats->push_back(allStats);
             zinfo->L3Cache->push_back(cache);
+        } else if (type == "ApproximateIdealDedup") {
+            g_string statName = name + g_string(" CompressionRatio");
+            RunningStats* crStats = new RunningStats(statName);
+            statName = name + g_string(" EvictionsPerAccess");
+            RunningStats* evStats = new RunningStats(statName);
+            statName = name + g_string(" TagArrayUtilization");
+            RunningStats* tutStats = new RunningStats(statName);
+            statName = name + g_string(" DataArrayUtilization");
+            RunningStats* dutStats = new RunningStats(statName);
+            uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
+            uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
+            tagRP->setCC(cc);
+
+            cache = new ApproximateIdealDedupCache(numLines*tagRatio, numLines, cc, dtagArray, ddataArray, dhashArray, tagRP, dataRP,
+                hashRP, accLat, invLat, mshrs, ways, timingCandidates, domain, name, crStats, evStats, tutStats, dutStats, hitStats, missStats, allStats);
+            zinfo->compressionRatioStats->push_back(crStats);
+            zinfo->evictionStats->push_back(evStats);
+            zinfo->tagUtilizationStats->push_back(tutStats);
+            zinfo->dataUtilizationStats->push_back(dutStats);
+            zinfo->tagHitStats->push_back(hitStats);
+            zinfo->tagMissStats->push_back(missStats);
+            zinfo->tagAllStats->push_back(allStats);
+            zinfo->L3Cache->push_back(cache);
         } else if (type == "ApproximateDedupBDI") {
             g_string statName = name + g_string(" CompressionRatio");
             RunningStats* crStats = new RunningStats(statName);
@@ -456,6 +481,29 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             tagRP->setCC(cc);
 
             cache = new ApproximateDedupBDICache(numLines*tagRatio, numLines, cc, dbtagArray, dbdataArray, dbhashArray, tagRP, dataRP,
+                hashRP, accLat, invLat, mshrs, ways, timingCandidates, domain, name, crStats, evStats, tutStats, dutStats, hitStats, missStats, allStats);
+            zinfo->compressionRatioStats->push_back(crStats);
+            zinfo->evictionStats->push_back(evStats);
+            zinfo->tagUtilizationStats->push_back(tutStats);
+            zinfo->dataUtilizationStats->push_back(dutStats);
+            zinfo->tagHitStats->push_back(hitStats);
+            zinfo->tagMissStats->push_back(missStats);
+            zinfo->tagAllStats->push_back(allStats);
+            zinfo->L3Cache->push_back(cache);
+        } else if (type == "ApproximateIdealDedupBDI") {
+            g_string statName = name + g_string(" CompressionRatio");
+            RunningStats* crStats = new RunningStats(statName);
+            statName = name + g_string(" EvictionsPerAccess");
+            RunningStats* evStats = new RunningStats(statName);
+            statName = name + g_string(" TagArrayUtilization");
+            RunningStats* tutStats = new RunningStats(statName);
+            statName = name + g_string(" DataArrayUtilization");
+            RunningStats* dutStats = new RunningStats(statName);
+            uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
+            uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
+            tagRP->setCC(cc);
+
+            cache = new ApproximateIdealDedupBDICache(numLines*tagRatio, numLines, cc, dbtagArray, dbdataArray, dbhashArray, tagRP, dataRP,
                 hashRP, accLat, invLat, mshrs, ways, timingCandidates, domain, name, crStats, evStats, tutStats, dutStats, hitStats, missStats, allStats);
             zinfo->compressionRatioStats->push_back(crStats);
             zinfo->evictionStats->push_back(evStats);
