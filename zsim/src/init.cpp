@@ -279,11 +279,9 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
         ddataArray = new ApproximateDedupDataArray(numLines, ways, dataRP, hf);
         uint32_t hashLines = config.get<uint32_t>(prefix + "hashLines", 64);
         uint32_t hashAssoc = config.get<uint32_t>(prefix + "hashAssoc", 8);
-        uint32_t hashSets = hashLines/hashAssoc;
         hashRP = new DataLRUReplPolicy(hashLines);
-        uint32_t setBits = 31 - __builtin_clz(hashSets);
         size_t seed = _Fnv_hash_bytes(prefix.c_str(), prefix.size()+1, 0xB4AC5B);
-        H3HashFamily* hashCompression = new H3HashFamily(1, setBits /*hashSetBits*/, 0xCAC7EAFFA1 + seed /*make randSeed depend on prefix*/);
+        H3HashFamily* hashCompression = new H3HashFamily(1, zinfo->hashSize, 0xCAC7EAFFA1 + seed /*make randSeed depend on prefix*/);
         dhashArray = new ApproximateDedupHashArray(hashLines, hashAssoc, hashRP, hf, hashCompression);
     } else if (arrayType == "ApproximateDedupBDI") {
         tagRP = new LRUReplPolicy<true>(numLines*tagRatio);
@@ -291,11 +289,9 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
         dbdataArray = new ApproximateDedupBDIDataArray(numLines, ways, hf);
         uint32_t hashLines = config.get<uint32_t>(prefix + "hashLines", 64);
         uint32_t hashAssoc = config.get<uint32_t>(prefix + "hashAssoc", 8);
-        uint32_t hashSets = hashLines/hashAssoc;
         hashRP = new DataLRUReplPolicy(hashLines);
-        uint32_t setBits = 31 - __builtin_clz(hashSets);
         size_t seed = _Fnv_hash_bytes(prefix.c_str(), prefix.size()+1, 0xB4AC5B);
-        H3HashFamily* hashCompression = new H3HashFamily(1, setBits /*hashSetBits*/, 0xCAC7EAFFA1 + seed /*make randSeed depend on prefix*/);
+        H3HashFamily* hashCompression = new H3HashFamily(1, zinfo->hashSize, 0xCAC7EAFFA1 + seed /*make randSeed depend on prefix*/);
         dbhashArray = new ApproximateDedupBDIHashArray(hashLines, hashAssoc, hashRP, hf, hashCompression);
     } else if (arrayType == "uniDoppelgangerBDI") {
         tagRP = new LRUReplPolicy<true>(numLines*tagRatio);
