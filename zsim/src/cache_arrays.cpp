@@ -1418,10 +1418,23 @@ uint64_t ApproximateDedupHashArray::hash(const DataLine data)
             _6 =  dataLine[6+8*i];
             _7 =  dataLine[7+8*i];
 
-            uint64_t step_64B = ((uint64_t) _0) + (((uint64_t) _1) << 8)  + (((uint64_t) _2) << 16) + (((uint64_t) _3) << 24)
+            uint64_t step_64b = ((uint64_t) _0) + (((uint64_t) _1) << 8)  + (((uint64_t) _2) << 16) + (((uint64_t) _3) << 24)
                             + (((uint64_t) _4) << 32) + (((uint64_t) _5) << 40) + (((uint64_t) _6) << 48) + (((uint64_t) _7) << 56);
 
-            XORs = XORs ^ dataHash->hash(0, step_64B);
+            uint64_t hashed_step_16b = dataHash->hash(0, step_64b);
+
+// 16bit- hashes - shifting 2 bits away so that they don't cancel eachother if a value keeps repeating
+/*
+0: 0123456789ABCDEF
+1:   0123456789ABCD EF
+2:     0123456789AB CDEF
+3:       0123456789 ABCDEF
+4:         01234567 89ABCDEF
+5:           012345 6789ABCDEF
+6:             0123 456789ABCDEF
+7:               01 23456789ABCDEF
+*/
+            XORs = XORs ^ ( (hashed_step_16b << (16 - (2*i)) ) | ( hashed_step_16b >> (2*i) ) );
         }
     } else {
         panic("not implemented yet for lines other than 16B/32B/64B");
@@ -2009,10 +2022,23 @@ uint64_t ApproximateDedupBDIHashArray::hash(const DataLine data)
             _6 =  dataLine[6+8*i];
             _7 =  dataLine[7+8*i];
 
-            uint64_t step_64B = ((uint64_t) _0) + (((uint64_t) _1) << 8)  + (((uint64_t) _2) << 16) + (((uint64_t) _3) << 24)
+            uint64_t step_64b = ((uint64_t) _0) + (((uint64_t) _1) << 8)  + (((uint64_t) _2) << 16) + (((uint64_t) _3) << 24)
                             + (((uint64_t) _4) << 32) + (((uint64_t) _5) << 40) + (((uint64_t) _6) << 48) + (((uint64_t) _7) << 56);
 
-            XORs = XORs ^ dataHash->hash(0, step_64B);
+            uint64_t hashed_step_16b = dataHash->hash(0, step_64b);
+
+// 16bit- hashes - shifting 2 bits away so that they don't cancel eachother if a value keeps repeating
+/*
+0: 0123456789ABCDEF
+1:   0123456789ABCD EF
+2:     0123456789AB CDEF
+3:       0123456789 ABCDEF
+4:         01234567 89ABCDEF
+5:           012345 6789ABCDEF
+6:             0123 456789ABCDEF
+7:               01 23456789ABCDEF
+*/
+            XORs = XORs ^ ( (hashed_step_16b << (16 - (2*i)) ) | ( hashed_step_16b >> (2*i) ) );
         }
     } else {
         panic("not implemented yet for lines other than 16B/32B/64B");
