@@ -6,12 +6,18 @@ ReplPolicy* dataRP, ReplPolicy* hashRP, uint32_t _accLat, uint32_t _invLat, uint
 RunningStats* _evStats, RunningStats* _tutStats, RunningStats* _dutStats, Counter* _tag_hits, Counter* _tag_misses, Counter* _all_misses) : TimingCache(_numTagLines, _cc, NULL, tagRP, _accLat, _invLat, mshrs, tagLat, ways, cands, _domain, _name, _evStats, _tag_hits, _tag_misses, _all_misses), numTagLines(_numTagLines),
 numDataLines(_numDataLines), dataAssoc(ways), tagArray(_tagArray), dataArray(_dataArray), hashArray(_hashArray), tagRP(tagRP), dataRP(dataRP), hashRP(hashRP), crStats(_crStats), evStats(_evStats), tutStats(_tutStats), dutStats(_dutStats) {
     dataArray->assignTagArray(tagArray);
+    hashArray->registerDataArray(dataArray);
     TM_DS = 0;
     TM_DD = 0;
     WD_TH_DS = 0;
     WD_TH_DD_1 = 0;
     WD_TH_DD_M = 0;
     WSR_TH = 0;
+    DS_HI = 0;
+    DS_HS = 0;
+    DS_HD = 0;
+    DD_HI = 0;
+    DD_HD = 0;
     g_string statName = name + g_string(" Deduplication Average");
     dupStats = new RunningStats(statName);
     statName = name + g_string(" Data Size Average");
@@ -201,8 +207,22 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
             BDICompressionEncoding encoding = dataArray->compress(data, &lineSize);
             // info("\tMiss Data Size: %u Segments", lineSize/8);
             // // info("size: %i", BDICompressionToSize(encoding, zinfo->lineSize)/8);
+            uint64_t hash = hashArray->hash(data);
+            int32_t hashId = hashArray->lookup(hash, &req, false);
 
             if (dataId != -1) {
+                if (hashId == -1) {
+                    DS_HI++;
+                    hashId = hashArray->preinsert(hash, &req);
+                    if(hashId != -1)
+                        hashArray->postinsert(hash, &req, dataId, segmentId, hashId, true);
+                } else if (hashArray->readDataPointer(hashId) == dataId && hashArray->readSegmentPointer(hashId) == segmentId) {
+                    DS_HS++;
+                } else {
+                    DS_HD++;
+                    if(dataArray->readCounter(hashArray->readDataPointer(hashId), hashArray->readSegmentPointer(hashId)) == 1)
+                        hashArray->postinsert(hash, &req, dataId, segmentId, hashId, true);
+                }
                 // // info("Found a matching hash, proceeding to match the full line.");
                 TM_DS++;
                 // info("\t\tfound matching data at %i.", dataId);
@@ -302,6 +322,17 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
                 tagArray->postinsert(req.lineAddr, &req, victimTagId, victimDataId, keptFromEvictions[0], encoding, -1, true);
                 // // info("postinsert %i", victimTagId);
                 dataArray->postinsert(victimTagId, &req, 1, victimDataId, keptFromEvictions[0], data, updateReplacement);
+                if (hashId == -1) {
+                    DD_HI++;
+                    hashId = hashArray->preinsert(hash, &req);
+                    if(hashId != -1)
+                        hashArray->postinsert(hash, &req, victimDataId, keptFromEvictions[0], hashId, true);
+                } else {
+                    DD_HD++;
+                    if(dataArray->readCounter(hashArray->readDataPointer(hashId), hashArray->readSegmentPointer(hashId)) == 1)
+                        hashArray->postinsert(hash, &req, victimDataId, keptFromEvictions[0], hashId, true);
+                }
+
                 assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
                 mse = new (evRec) MissStartEvent(this, accLat, domain);
                 // // // info("uCREATE: %p at %u", mse, __LINE__);
@@ -350,6 +381,8 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
                 // // info("PUTX Hit Req");
                 int32_t targetDataId = -1;
                 int32_t targetSegmentId = -1;
+                uint64_t hash = hashArray->hash(data);
+                int32_t hashId = hashArray->lookup(hash, &req, false);
                 for (uint32_t i = 0; i < numDataLines/dataAssoc; i++) {
                     for (uint32_t j = 0; j < dataAssoc*8; j++) {
                         if (dataArray->readCounter(i, j) && dataArray->isSame(i, j, data)) {
@@ -361,6 +394,18 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
                 }
                 if (targetDataId != -1) {
                     // // info("Hash Hit");
+                    if (hashId == -1) {
+                        DS_HI++;
+                        hashId = hashArray->preinsert(hash, &req);
+                        if(hashId != -1)
+                            hashArray->postinsert(hash, &req, targetDataId, targetSegmentId, hashId, true);
+                    } else if (hashArray->readDataPointer(hashId) == targetDataId && hashArray->readSegmentPointer(hashId) == targetSegmentId) {
+                        DS_HS++;
+                    } else {
+                        DS_HD++;
+                        if(dataArray->readCounter(hashArray->readDataPointer(hashId), hashArray->readSegmentPointer(hashId)) == 1)
+                            hashArray->postinsert(hash, &req, targetDataId, targetSegmentId, hashId, true);
+                    }
                     WD_TH_DS++;
                     // info("\t\tFound matching data at %i.", targetDataId);
                     respCycle += accLat;
@@ -484,6 +529,16 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
                         // // // info("SHOULD CHANGE");
                         tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement, false);
                         dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data, updateReplacement);
+                        if (hashId == -1) {
+                            DD_HI++;
+                            hashId = hashArray->preinsert(hash, &req);
+                            if(hashId != -1)
+                                hashArray->postinsert(hash, &req, victimDataId, keptFromEvictions[0], hashId, true);
+                        } else {
+                            DD_HD++;
+                            if(dataArray->readCounter(hashArray->readDataPointer(hashId), hashArray->readSegmentPointer(hashId)) == 1)
+                                hashArray->postinsert(hash, &req, victimDataId, keptFromEvictions[0], hashId, true);
+                        }
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -589,6 +644,16 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
                         tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement, false);
                         // // info("postinsert %i", tagId);
                         dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data, updateReplacement);
+                        if (hashId == -1) {
+                            DD_HI++;
+                            hashId = hashArray->preinsert(hash, &req);
+                            if(hashId != -1)
+                                hashArray->postinsert(hash, &req, victimDataId, keptFromEvictions[0], hashId, true);
+                        } else {
+                            DD_HD++;
+                            if(dataArray->readCounter(hashArray->readDataPointer(hashId), hashArray->readSegmentPointer(hashId)) == 1)
+                                hashArray->postinsert(hash, &req, victimDataId, keptFromEvictions[0], hashId, true);
+                        }
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -733,6 +798,11 @@ void ApproximateIdealDedupBDICache::dumpStats() {
     info("WD_TH_DD_1: %lu", WD_TH_DD_1);
     info("WD_TH_DD_M: %lu", WD_TH_DD_M);
     info("WSR_TH: %lu", WSR_TH);
+    info("DS_HI: %lu", DS_HI);
+    info("DS_HS: %lu", DS_HS);
+    info("DS_HD: %lu", DS_HD);
+    info("DD_HI: %lu", DD_HI);
+    info("DD_HD: %lu", DD_HD);
     dupStats->dump();
     bdiStats->dump();
 }

@@ -5,12 +5,18 @@ ApproximateIdealDedupCache::ApproximateIdealDedupCache(uint32_t _numTagLines, ui
 ReplPolicy* dataRP, ReplPolicy* hashRP, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name, RunningStats* _crStats,
 RunningStats* _evStats, RunningStats* _tutStats, RunningStats* _dutStats, Counter* _tag_hits, Counter* _tag_misses, Counter* _tag_all) : TimingCache(_numTagLines, _cc, NULL, tagRP, _accLat, _invLat, mshrs, tagLat, ways, cands, _domain, _name, _evStats, _tag_hits, _tag_misses, _tag_all), numTagLines(_numTagLines),
 numDataLines(_numDataLines), tagArray(_tagArray), dataArray(_dataArray), hashArray(_hashArray), tagRP(tagRP), dataRP(dataRP), hashRP(hashRP), crStats(_crStats), evStats(_evStats), tutStats(_tutStats), dutStats(_dutStats) {
+    hashArray->registerDataArray(dataArray);
     TM_DS = 0;
     TM_DD = 0;
     WD_TH_DS = 0;
     WD_TH_DD_1 = 0;
     WD_TH_DD_M = 0;
     WSR_TH = 0;
+    DS_HI = 0;
+    DS_HS = 0;
+    DS_HD = 0;
+    DD_HI = 0;
+    DD_HD = 0;
     g_string statName = name + g_string(" Deduplication Average");
     dupStats = new RunningStats(statName);
 }
@@ -187,7 +193,21 @@ uint64_t ApproximateIdealDedupCache::access(MemReq& req) {
                     break;
                 }
             }
+            uint64_t hash = hashArray->hash(data);
+            int32_t hashId = hashArray->lookup(hash, &req, false);
             if (dataId != -1) {
+                if (hashId == -1) {
+                    DS_HI++;
+                    hashId = hashArray->preinsert(hash, &req);
+                    if(hashId != -1)
+                        hashArray->postinsert(hash, &req, dataId, hashId, true);
+                } else if (hashArray->readDataPointer(hashId) == dataId) {
+                    DS_HS++;
+                } else {
+                    DS_HD++;
+                    if(dataArray->readCounter(hashArray->readDataPointer(hashId)) == 1)
+                        hashArray->postinsert(hash, &req, dataId, hashId, true);
+                }
                 TM_DS++;
                 // info("\t\tfound matching data at %i.", dataId);
                 int32_t oldListHead = dataArray->readListHead(dataId);
@@ -225,6 +245,16 @@ uint64_t ApproximateIdealDedupCache::access(MemReq& req) {
                 evictCycle = respCycle + accLat;
                 int32_t victimListHeadId, newVictimListHeadId;
                 int32_t victimDataId = dataArray->preinsert(&victimListHeadId);
+                if (hashId == -1) {
+                    DD_HI++;
+                    hashId = hashArray->preinsert(hash, &req);
+                    if(hashId != -1)
+                        hashArray->postinsert(hash, &req, victimDataId, hashId, true);
+                } else {
+                    DD_HD++;
+                    if(dataArray->readCounter(hashArray->readDataPointer(hashId)) == 1)
+                        hashArray->postinsert(hash, &req, victimDataId, hashId, true);
+                }
                 // info("\t\tEvicting dataline %i", victimDataId);
                 uint64_t evBeginCycle = evictCycle;
                 TimingRecord writebackRecord;
@@ -299,6 +329,8 @@ uint64_t ApproximateIdealDedupCache::access(MemReq& req) {
             if (req.type == PUTX && !dataArray->isSame(dataId, data)) {
                 // int32_t dataId = hashArray->readDataPointer(hashId);
                 // info("\tWrite Tag Hit, Data different");
+                uint64_t hash = hashArray->hash(data);
+                int32_t hashId = hashArray->lookup(hash, &req, false);
                 int32_t targetDataId = -1;
                 for (uint32_t i = 0; i < numDataLines; i++) {
                     if (dataArray->readCounter(i) && dataArray->isSame(i, data)) {
@@ -307,6 +339,18 @@ uint64_t ApproximateIdealDedupCache::access(MemReq& req) {
                     }
                 }
                 if (targetDataId != -1) {
+                    if (hashId == -1) {
+                        DS_HI++;
+                        hashId = hashArray->preinsert(hash, &req);
+                        if(hashId != -1)
+                            hashArray->postinsert(hash, &req, targetDataId, hashId, true);
+                    } else if (hashArray->readDataPointer(hashId) == targetDataId) {
+                        DS_HS++;
+                    } else {
+                        DS_HD++;
+                        if(dataArray->readCounter(hashArray->readDataPointer(hashId)) == 1)
+                            hashArray->postinsert(hash, &req, targetDataId, hashId, true);
+                    }
                     WD_TH_DS++;
                     // info("\t\tFound matching data at %i.", targetDataId);
                     // // info("Data is also similar to %i.", targetDataId);
@@ -367,6 +411,16 @@ uint64_t ApproximateIdealDedupCache::access(MemReq& req) {
                 } else {
                     // info("\t\tCouldn't find a matching hash.");
                     if (dataArray->readCounter(dataId) == 1) {
+                        if (hashId == -1) {
+                            DD_HI++;
+                            hashId = hashArray->preinsert(hash, &req);
+                            if(hashId != -1)
+                                hashArray->postinsert(hash, &req, dataId, hashId, true);
+                        } else {
+                            DD_HD++;
+                            if(dataArray->readCounter(hashArray->readDataPointer(hashId)) == 1)
+                                hashArray->postinsert(hash, &req, dataId, hashId, true);
+                        }
                         WD_TH_DD_1++;
                         // info("\t\tOnly had one tag. Overwriting self instead of picking random data victim.");
                         // Data only exists once, just update.
@@ -411,6 +465,16 @@ uint64_t ApproximateIdealDedupCache::access(MemReq& req) {
                         int32_t victimDataId = dataArray->preinsert(&victimListHeadId);
                         while (victimDataId == dataId)
                             victimDataId = dataArray->preinsert(&victimListHeadId);
+                        if (hashId == -1) {
+                            DD_HI++;
+                            hashId = hashArray->preinsert(hash, &req);
+                            if(hashId != -1)
+                                hashArray->postinsert(hash, &req, victimDataId, hashId, true);
+                        } else {
+                            DD_HD++;
+                            if(dataArray->readCounter(hashArray->readDataPointer(hashId)) == 1)
+                                hashArray->postinsert(hash, &req, victimDataId, hashId, true);
+                        }
                         // info("\t\tEvicting dataline %i", victimDataId);
                         uint64_t evBeginCycle = evictCycle;
                         uint64_t evDoneCycle = evBeginCycle;
@@ -560,5 +624,10 @@ void ApproximateIdealDedupCache::dumpStats() {
     info("WD_TH_DD_1: %lu", WD_TH_DD_1);
     info("WD_TH_DD_M: %lu", WD_TH_DD_M);
     info("WSR_TH: %lu", WSR_TH);
+    info("DS_HI: %lu", DS_HI);
+    info("DS_HS: %lu", DS_HS);
+    info("DS_HD: %lu", DS_HD);
+    info("DD_HI: %lu", DD_HI);
+    info("DD_HD: %lu", DD_HD);
     dupStats->dump();
 }

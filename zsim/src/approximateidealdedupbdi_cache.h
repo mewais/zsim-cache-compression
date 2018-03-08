@@ -35,6 +35,12 @@ class ApproximateIdealDedupBDICache : public TimingCache {
         uint64_t WD_TH_DD_M;
         uint64_t WSR_TH;
 
+        uint64_t DS_HI;
+        uint64_t DS_HS;
+        uint64_t DS_HD;
+        uint64_t DD_HI;
+        uint64_t DD_HD;
+
     public:
         ApproximateIdealDedupBDICache(uint32_t _numTagLines, uint32_t _numDataLines, CC* _cc, ApproximateDedupBDITagArray* _tagArray, ApproximateDedupBDIDataArray* _dataArray, ApproximateDedupBDIHashArray* _hashArray, ReplPolicy* tagRP,
                         ReplPolicy* dataRP, ReplPolicy* hashRP, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name, RunningStats* _crStats,
