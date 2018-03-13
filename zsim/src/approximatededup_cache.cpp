@@ -17,10 +17,17 @@ numDataLines(_numDataLines), tagArray(_tagArray), dataArray(_dataArray), hashArr
     WD_TH_HH_DD_1 = 0;
     WD_TH_HH_DD_M = 0;
     WSR_TH = 0;
+    tagCausedEv = 0;
+    TM_HH_DD_dedupCausedEv = 0;
+    TM_HM_dedupCausedEv = 0;
+    WD_TH_HH_DD_M_dedupCausedEv = 0;
+    WD_TH_HM_M_dedupCausedEv = 0;
     g_string statName = name + g_string(" Deduplication Average");
     dupStats = new RunningStats(statName);
     statName = name + g_string(" Hash Array Utilization");
     hutStats = new RunningStats(statName);
+    statName = name + g_string(" Maximum Util Average");
+    mutStats = new RunningStats(statName);
 }
 
 void ApproximateDedupCache::initStats(AggregateStat* parentStat) {
@@ -175,6 +182,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
             tagArray->postinsert(0, &req, victimTagId, -1, -1, false, false);
             if (evRec->hasRecord()) {
                 // // info("\t\tEvicting tagId: %i", victimTagId);
+                tagCausedEv++;
                 Evictions++;
                 tagWritebackRecord.clear();
                 tagWritebackRecord = evRec->popRecord();
@@ -287,6 +295,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                         }
                         if (evRec->hasRecord()) {
+                            TM_HH_DD_dedupCausedEv++;
                             Evictions++;
                             writebackRecord.clear();
                             writebackRecord = evRec->popRecord();
@@ -360,6 +369,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                     }
                     if (evRec->hasRecord()) {
+                        TM_HM_dedupCausedEv++;
                         Evictions++;
                         writebackRecord.clear();
                         writebackRecord = evRec->popRecord();
@@ -604,6 +614,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                                     newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                 }
                                 if (evRec->hasRecord()) {
+                                    WD_TH_HH_DD_M_dedupCausedEv++;
                                     Evictions++;
                                     writebackRecord.clear();
                                     writebackRecord = evRec->popRecord();
@@ -719,6 +730,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                                 newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                             }
                             if (evRec->hasRecord()) {
+                                WD_TH_HM_M_dedupCausedEv++;
                                 Evictions++;
                                 writebackRecord.clear();
                                 writebackRecord = evRec->popRecord();
@@ -816,10 +828,15 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
     }
 
     sample = (double)dataArray->getValidLines()/numDataLines;
+    double Num1 = sample;
     dutStats->add(sample, 1);
 
     sample = (double)tagArray->getValidLines()/numTagLines;
+    double Num2 = sample;
     tutStats->add(sample, 1);
+
+    sample = std::max(Num1, Num2);
+    mutStats->add(sample, 1);
 
     sample = (double)tagArray->getValidLines()/dataArray->getValidLines();
     dupStats->add(sample, 1);
@@ -861,4 +878,10 @@ void ApproximateDedupCache::dumpStats() {
     info("WSR_TH: %lu", WSR_TH);
     hutStats->dump();
     dupStats->dump();
+    mutStats->dump();
+    info("tagCausedEv: %lu", tagCausedEv);
+    info("TM_HH_DD_dedupCausedEv: %lu", TM_HH_DD_dedupCausedEv);
+    info("TM_HM_dedupCausedEv : %lu", TM_HM_dedupCausedEv);
+    info("WD_TH_HH_DD_M_dedupCausedEv: %lu", WD_TH_HH_DD_M_dedupCausedEv);
+    info("WD_TH_HM_M_dedupCausedEv: %lu", WD_TH_HM_M_dedupCausedEv);
 }

@@ -23,6 +23,11 @@ class ApproximateBDICache : public TimingCache {
         RunningStats* tutStats;
         RunningStats* dutStats;
         RunningStats* bdiStats;
+        RunningStats* mutStats;
+
+        uint64_t tagCausedEv;
+        uint64_t TM_bdiCausedEv;
+        uint64_t WD_TH_bdiCausedEv;
 
     public:
         ApproximateBDICache(uint32_t _numTagLines, uint32_t _numDataLines, CC* _cc, ApproximateBDITagArray* _tagArray, ApproximateBDIDataArray* _dataArray, ReplPolicy* tagRP, ReplPolicy* dataRP, uint32_t _accLat, uint32_t _invLat,

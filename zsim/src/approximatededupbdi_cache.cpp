@@ -18,12 +18,32 @@ numDataLines(_numDataLines), dataAssoc(ways), tagArray(_tagArray), dataArray(_da
     WD_TH_HH_DD_1 = 0;
     WD_TH_HH_DD_M = 0;
     WSR_TH = 0;
+    tagCausedEv = 0;
+    TM_HH_DI_dedupCausedEv = 0;
+    TM_HH_DD_dedupCausedEv = 0;
+    TM_HM_dedupCausedEv = 0;
+    WD_TH_HH_DI_dedupCausedEv = 0;
+    WD_TH_HH_DD_1_dedupCausedEv = 0;
+    WD_TH_HH_DD_M_dedupCausedEv = 0;
+    WD_TH_HM_1_dedupCausedEv = 0;
+    WD_TH_HM_M_dedupCausedEv = 0;
+    TM_HH_DI_bdiCausedEv = 0;
+    TM_HH_DD_bdiCausedEv = 0;
+    TM_HM_bdiCausedEv = 0;
+    WD_TH_HH_DI_bdiCausedEv = 0;
+    WD_TH_HH_DD_1_bdiCausedEv = 0;
+    WD_TH_HH_DD_M_bdiCausedEv = 0;
+    WD_TH_HM_1_bdiCausedEv = 0;
+    WD_TH_HM_M_bdiCausedEv = 0;
+
     g_string statName = name + g_string(" Deduplication Average");
     dupStats = new RunningStats(statName);
     statName = name + g_string(" Data Size Average");
     bdiStats = new RunningStats(statName);
     statName = name + g_string(" Hash Array Utilization");
     hutStats = new RunningStats(statName);
+    statName = name + g_string(" Maximum Util Average");
+    mutStats = new RunningStats(statName);
 }
 
 void ApproximateDedupBDICache::initStats(AggregateStat* parentStat) {
@@ -182,6 +202,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
             if (evRec->hasRecord()) {
                 // // info("\t\tEvicting tagId: %i", victimTagId);
                 Evictions++;
+                tagCausedEv++;
                 tagWritebackRecord.clear();
                 tagWritebackRecord = evRec->popRecord();
             }
@@ -236,6 +257,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         TimingRecord writebackRecord;
                         lastEvDoneCycle = tagEvDoneCycle;
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
+                        bool started = false;
                         while (victimListHeadId != -1) {
                             if (victimListHeadId != victimTagId) {
                                 // info("\t\tEvicting TagId: %i", victimListHeadId);
@@ -250,6 +272,10 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                             }
                             if (evRec->hasRecord()) {
+                                if (!started)
+                                    TM_HH_DI_bdiCausedEv++;
+                                TM_HH_DI_dedupCausedEv++;
+                                started = true;
                                 Evictions++;
                                 writebackRecord.clear();
                                 writebackRecord = evRec->popRecord();
@@ -365,6 +391,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         TimingRecord writebackRecord;
                         lastEvDoneCycle = tagEvDoneCycle;
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
+                        bool started = false;
                         while (victimListHeadId != -1) {
                             if (victimListHeadId != victimTagId) {
                                 // info("\t\tEvicting TagId: %i", victimListHeadId);
@@ -379,6 +406,10 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                             }
                             if (evRec->hasRecord()) {
+                                if (!started)
+                                    TM_HH_DD_bdiCausedEv++;
+                                TM_HH_DD_dedupCausedEv++;
+                                started = true;
                                 Evictions++;
                                 writebackRecord.clear();
                                 writebackRecord = evRec->popRecord();
@@ -465,6 +496,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     TimingRecord writebackRecord;
                     lastEvDoneCycle = tagEvDoneCycle;
                     if (evRec->hasRecord()) accessRecord = evRec->popRecord();
+                    bool started = false;
                     while (victimListHeadId != -1) {
                         if (victimListHeadId != victimTagId) {
                             // info("\t\tEvicting TagId: %i", victimListHeadId);
@@ -479,6 +511,10 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                         }
                         if (evRec->hasRecord()) {
+                            if (!started)
+                                TM_HM_bdiCausedEv++;
+                            TM_HM_dedupCausedEv++;
+                            started = true;
                             Evictions++;
                             writebackRecord.clear();
                             writebackRecord = evRec->popRecord();
@@ -607,6 +643,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             TimingRecord writebackRecord;
                             lastEvDoneCycle = evBeginCycle;
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
+                            bool started = false;
                             while (victimListHeadId != -1) {
                                 if (victimListHeadId != tagId) {
                                     // info("\t\tEvicting TagId: %i", victimListHeadId);
@@ -621,6 +658,10 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                     newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                 }
                                 if (evRec->hasRecord()) {
+                                    if (!started)
+                                        WD_TH_HH_DI_bdiCausedEv++;
+                                    WD_TH_HH_DI_dedupCausedEv++;
+                                    started = true;
                                     Evictions++;
                                     writebackRecord.clear();
                                     writebackRecord = evRec->popRecord();
@@ -762,6 +803,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 TimingRecord writebackRecord;
                                 lastEvDoneCycle = evBeginCycle;
                                 if (evRec->hasRecord()) accessRecord = evRec->popRecord();
+                                bool started = false;
                                 while (victimListHeadId != -1) {
                                     if (victimListHeadId != tagId) {
                                         // info("\t\tEvicting TagId: %i", victimListHeadId);
@@ -776,6 +818,10 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                         newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                     }
                                     if (evRec->hasRecord()) {
+                                        if (!started)
+                                            WD_TH_HH_DD_1_bdiCausedEv++;
+                                        WD_TH_HH_DD_1_dedupCausedEv++;
+                                        started = true;
                                         Evictions++;
                                         writebackRecord.clear();
                                         writebackRecord = evRec->popRecord();
@@ -868,6 +914,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 TimingRecord writebackRecord;
                                 lastEvDoneCycle = evBeginCycle;
                                 if (evRec->hasRecord()) accessRecord = evRec->popRecord();
+                                bool started = false;
                                 while (victimListHeadId != -1) {
                                     if (victimListHeadId != tagId) {
                                         // info("\t\tEvicting TagId: %i", victimListHeadId);
@@ -882,6 +929,10 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                         newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                     }
                                     if (evRec->hasRecord()) {
+                                        if (!started)
+                                            WD_TH_HH_DD_M_bdiCausedEv++;
+                                        WD_TH_HH_DD_M_dedupCausedEv++;
+                                        started = true;
                                         Evictions++;
                                         writebackRecord.clear();
                                         writebackRecord = evRec->popRecord();
@@ -984,6 +1035,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             TimingRecord writebackRecord;
                             lastEvDoneCycle = evBeginCycle;
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
+                            bool started = false;
                             while (victimListHeadId != -1) {
                                 if (victimListHeadId != tagId) {
                                     // info("\t\tEvicting TagId: %i", victimListHeadId);
@@ -998,6 +1050,10 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                     newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                 }
                                 if (evRec->hasRecord()) {
+                                    if (!started)
+                                        WD_TH_HM_1_bdiCausedEv++;
+                                    WD_TH_HM_1_dedupCausedEv++;
+                                    started = true;
                                     Evictions++;
                                     writebackRecord.clear();
                                     writebackRecord = evRec->popRecord();
@@ -1091,6 +1147,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             TimingRecord writebackRecord;
                             lastEvDoneCycle = evBeginCycle;
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
+                            bool started = false;
                             while (victimListHeadId != -1) {
                                 if (victimListHeadId != tagId) {
                                     // info("\t\tEvicting TagId: %i", victimListHeadId);
@@ -1105,6 +1162,10 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                     newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                 }
                                 if (evRec->hasRecord()) {
+                                    if (!started)
+                                        WD_TH_HM_M_bdiCausedEv++;
+                                    WD_TH_HM_M_dedupCausedEv++;
+                                    started = true;
                                     Evictions++;
                                     writebackRecord.clear();
                                     writebackRecord = evRec->popRecord();
@@ -1223,9 +1284,11 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
     }
 
     sample = ((double)tagArray->getDataValidSegments()/8)/numDataLines;
+    double Num1 = sample;
     dutStats->add(sample, 1);
 
     sample = (double)tagArray->getValidLines()/numTagLines;
+    double Num2 = sample;
     tutStats->add(sample, 1);
 
     uint32_t compressedLineCount = 0;
@@ -1242,6 +1305,9 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
 
     sample = (double)tagArray->getDataValidSegments()/compressedLineCount;
     bdiStats->add(sample, 1);
+
+    sample = std::max(Num1, Num2);
+    mutStats->add(sample, 1);
 
     hutStats->add(hashArray->countValidLines(), 1);
 
@@ -1281,4 +1347,23 @@ void ApproximateDedupBDICache::dumpStats() {
     hutStats->dump();
     dupStats->dump();
     bdiStats->dump();
+    mutStats->dump();
+
+    info("tagCausedEv: %lu",                 tagCausedEv);
+    info("TM_HH_DI_dedupCausedEv: %lu",      TM_HH_DI_dedupCausedEv);
+    info("TM_HH_DD_dedupCausedEv: %lu",      TM_HH_DD_dedupCausedEv);
+    info("TM_HM_dedupCausedEv: %lu",         TM_HM_dedupCausedEv);
+    info("WD_TH_HH_DI_dedupCausedEv: %lu",   WD_TH_HH_DI_dedupCausedEv);
+    info("WD_TH_HH_DD_1_dedupCausedEv: %lu", WD_TH_HH_DD_1_dedupCausedEv);
+    info("WD_TH_HH_DD_M_dedupCausedEv: %lu", WD_TH_HH_DD_M_dedupCausedEv);
+    info("WD_TH_HM_1_dedupCausedEv: %lu",    WD_TH_HM_1_dedupCausedEv);
+    info("WD_TH_HM_M_dedupCausedEv: %lu",    WD_TH_HM_M_dedupCausedEv);
+    info("TM_HH_DI_bdiCausedEv: %lu",        TM_HH_DI_bdiCausedEv);
+    info("TM_HH_DD_bdiCausedEv: %lu",        TM_HH_DD_bdiCausedEv);
+    info("TM_HM_bdiCausedEv: %lu",           TM_HM_bdiCausedEv);
+    info("WD_TH_HH_DI_bdiCausedEv: %lu",     WD_TH_HH_DI_bdiCausedEv);
+    info("WD_TH_HH_DD_1_bdiCausedEv: %lu",   WD_TH_HH_DD_1_bdiCausedEv);
+    info("WD_TH_HH_DD_M_bdiCausedEv: %lu",   WD_TH_HH_DD_M_bdiCausedEv);
+    info("WD_TH_HM_1_bdiCausedEv: %lu",      WD_TH_HM_1_bdiCausedEv);
+    info("WD_TH_HM_M_bdiCausedEv: %lu",      WD_TH_HM_M_bdiCausedEv);
 }

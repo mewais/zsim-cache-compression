@@ -28,6 +28,7 @@ class ApproximateDedupBDICache : public TimingCache {
         RunningStats* hutStats;
         RunningStats* dupStats;
         RunningStats* bdiStats;
+        RunningStats* mutStats;
 
         uint64_t TM_HM;
         uint64_t TM_HH_DI;
@@ -40,6 +41,24 @@ class ApproximateDedupBDICache : public TimingCache {
         uint64_t WD_TH_HH_DD_1;
         uint64_t WD_TH_HH_DD_M;
         uint64_t WSR_TH;
+
+        uint64_t tagCausedEv;
+        uint64_t TM_HH_DI_dedupCausedEv;
+        uint64_t TM_HH_DD_dedupCausedEv;
+        uint64_t TM_HM_dedupCausedEv;
+        uint64_t WD_TH_HH_DI_dedupCausedEv;
+        uint64_t WD_TH_HH_DD_1_dedupCausedEv;
+        uint64_t WD_TH_HH_DD_M_dedupCausedEv;
+        uint64_t WD_TH_HM_1_dedupCausedEv;
+        uint64_t WD_TH_HM_M_dedupCausedEv;
+        uint64_t TM_HH_DI_bdiCausedEv;
+        uint64_t TM_HH_DD_bdiCausedEv;
+        uint64_t TM_HM_bdiCausedEv;
+        uint64_t WD_TH_HH_DI_bdiCausedEv;
+        uint64_t WD_TH_HH_DD_1_bdiCausedEv;
+        uint64_t WD_TH_HH_DD_M_bdiCausedEv;
+        uint64_t WD_TH_HM_1_bdiCausedEv;
+        uint64_t WD_TH_HM_M_bdiCausedEv;
 
     public:
         ApproximateDedupBDICache(uint32_t _numTagLines, uint32_t _numDataLines, CC* _cc, ApproximateDedupBDITagArray* _tagArray, ApproximateDedupBDIDataArray* _dataArray, ApproximateDedupBDIHashArray* _hashArray, ReplPolicy* tagRP, 

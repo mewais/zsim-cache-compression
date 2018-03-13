@@ -26,6 +26,7 @@ class ApproximateDedupCache : public TimingCache {
         RunningStats* dutStats;
         RunningStats* hutStats;
         RunningStats* dupStats;
+        RunningStats* mutStats;
 
         uint64_t TM_HM;
         uint64_t TM_HH_DI;
@@ -38,6 +39,12 @@ class ApproximateDedupCache : public TimingCache {
         uint64_t WD_TH_HH_DD_1;
         uint64_t WD_TH_HH_DD_M;
         uint64_t WSR_TH;
+
+        uint64_t tagCausedEv;
+        uint64_t TM_HH_DD_dedupCausedEv;
+        uint64_t TM_HM_dedupCausedEv;
+        uint64_t WD_TH_HH_DD_M_dedupCausedEv;
+        uint64_t WD_TH_HM_M_dedupCausedEv;
 
     public:
         ApproximateDedupCache(uint32_t _numTagLines, uint32_t _numDataLines, CC* _cc, ApproximateDedupTagArray* _tagArray, ApproximateDedupDataArray* _dataArray, ApproximateDedupHashArray* _hashArray, ReplPolicy* tagRP, 

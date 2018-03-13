@@ -8,6 +8,11 @@ _accLat, _invLat, mshrs, tagLat, ways, cands, _domain, _name, _evStats, _tag_hit
 evStats(_evStats), tutStats(_tutStats), dutStats(_dutStats) {
     g_string statName = name + g_string(" Data Size Average");
     bdiStats = new RunningStats(statName);
+    statName = name + g_string(" Maximum Util Average");
+    mutStats = new RunningStats(statName);
+    tagCausedEv = 0;
+    TM_bdiCausedEv = 0;
+    WD_TH_bdiCausedEv = 0;
 }
 
 void ApproximateBDICache::initStats(AggregateStat* parentStat) {
@@ -139,6 +144,7 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
             if (evRec->hasRecord()) {
                 // info("\t\tand its data of size %i segments", BDICompressionToSize(tagArray->readCompressionEncoding(victimTagId), zinfo->lineSize)/8);
                 // // info("\t\tEvicting tagId: %i", victimTagId);
+                tagCausedEv++;
                 Evictions++;
                 tagWritebackRecord.clear();
                 tagWritebackRecord = evRec->popRecord();
@@ -173,6 +179,7 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                 if (evRec->hasRecord()) {
                     // // info("\t\tEvicting tagId: %i", victimTagId2);
                     // info("\t\tand freed %i segments", size);
+                    TM_bdiCausedEv++;
                     Evictions++;
                     writebackRecord.clear();
                     writebackRecord = evRec->popRecord();
@@ -271,6 +278,7 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                         if (evRec->hasRecord()) {
                             // info("\t\tand freed %i segments", size);
                             // // info("\t\tEvicting tagId: %i", victimTagId);
+                            WD_TH_bdiCausedEv++;
                             Evictions++;
                             writebackRecord.clear();
                             writebackRecord = evRec->popRecord();
@@ -347,10 +355,15 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
     }
 
     sample = ((double)tagArray->getDataValidSegments()/8)/numDataLines;
+    double Num1 = sample;
     dutStats->add(sample, 1);
 
     sample = (double)tagArray->getValidLines()/numTagLines;
+    double Num2 = sample;
     tutStats->add(sample, 1);
+
+    sample = std::max(Num1, Num2);
+    mutStats->add(sample, 1);
 
     sample = (double)tagArray->getDataValidSegments()/tagArray->getValidLines();
     bdiStats->add(sample, 1);
@@ -378,4 +391,8 @@ void ApproximateBDICache::simulateHitWriteback(aHitWritebackEvent* ev, uint64_t 
 
 void ApproximateBDICache::dumpStats() {
     bdiStats->dump();
+    mutStats->dump();
+    info("tagCausedEv: %lu", tagCausedEv);
+    info("TM_bdiCausedEv: %lu", TM_bdiCausedEv);
+    info("WD_TH_bdiCausedEv: %lu", WD_TH_bdiCausedEv);
 }
