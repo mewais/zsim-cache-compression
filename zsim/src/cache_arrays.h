@@ -381,10 +381,8 @@ class ApproximateDedupBDIDataArray : public ApproximateBDIDataArray {
         uint32_t validLines;
         std::mt19937* RNG;
         std::uniform_int_distribution<>* DIST;
-        g_vector<int32_t> freeList;
+        g_vector<g_vector<int32_t>> freeList;
         ApproximateDedupBDITagArray* tagArray;
-        g_vector<int32_t> MRUList;
-        uint32_t MRU_SIZE; // how many sets to record
 
     public:
         ApproximateDedupBDIDataArray(uint32_t _numLines, uint32_t _assoc, HashFamily* _hf);

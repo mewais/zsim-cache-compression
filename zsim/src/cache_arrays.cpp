@@ -1661,12 +1661,15 @@ ApproximateDedupBDIDataArray::ApproximateDedupBDIDataArray(uint32_t _numLines, u
     // approximateArray = gm_calloc<bool>(numLines);
     compressedDataArray = gm_malloc<DataLine*>(numSets);
     rp = gm_calloc<DataLRUReplPolicy*>(numSets);
+    // notice that you will always need to access freeList by [size-1]
+    g_vector<g_vector<int32_t>> tmp(8);
+    freeList = tmp;
     for (uint32_t i = 0; i < numSets; i++) {
         tagCounterArray[i] = gm_calloc<int32_t>(assoc*zinfo->lineSize/8);
         tagPointerArray[i] = gm_calloc<int32_t>(assoc*zinfo->lineSize/8);
         compressedDataArray[i] = gm_calloc<DataLine>(assoc*zinfo->lineSize/8);
         rp[i] = new DataLRUReplPolicy(assoc*zinfo->lineSize/8);
-        freeList.push_back(i);
+        freeList[7].push_back(i);
         for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++) {
             tagPointerArray[i][j] = -1;
             compressedDataArray[i][j] = gm_calloc<uint8_t>(zinfo->lineSize);
@@ -1678,7 +1681,6 @@ ApproximateDedupBDIDataArray::ApproximateDedupBDIDataArray(uint32_t _numLines, u
     std::random_device rd;
     RNG = new std::mt19937(rd());
     DIST = new std::uniform_int_distribution<>(0, numSets-1);
-    MRU_SIZE = zinfo->mruListSize;
 
     assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
 }
@@ -1699,20 +1701,6 @@ ApproximateDedupBDIDataArray::~ApproximateDedupBDIDataArray() {
 
 void ApproximateDedupBDIDataArray::lookup(int32_t dataId, int32_t segmentId, const MemReq* req, bool updateReplacement) {
     if (updateReplacement) rp[dataId]->update(segmentId, req);
-
-    auto it = std::find(MRUList.begin(), MRUList.end(), dataId);
-    if((it != MRUList.end())) {
-        if  (MRUList.back() != dataId) {
-            // we have same entry => bring it to the front
-            auto index = std::distance(MRUList.begin(), it);
-            MRUList.erase(MRUList.begin() + index);
-            MRUList.push_back(dataId);
-        }
-    } else {
-        if (MRUList.size() > MRU_SIZE -1) // full size used
-            MRUList.erase(MRUList.begin()); // pop the last one
-        MRUList.push_back(dataId);
-    }
 }
 
 void ApproximateDedupBDIDataArray::assignTagArray(ApproximateDedupBDITagArray* _tagArray) {
@@ -1722,17 +1710,16 @@ void ApproximateDedupBDIDataArray::assignTagArray(ApproximateDedupBDITagArray* _
 int32_t ApproximateDedupBDIDataArray::preinsert(uint16_t lineSize) {
     float leastValue = 999999;
     int32_t leastId = 0;
-    if (freeList.size()) {
-        leastId = freeList.back();
-        freeList.pop_back();
-        return leastId;
+    for (uint32_t i = (lineSize/8)-1; i < 8; i++) {
+        if (freeList[i].size()) {
+            leastId = freeList[i].back();
+            freeList[i].pop_back();
+            return leastId;
+        }
     }
-    int32_t zeroFound =1;
-    for (uint32_t i = 0; i < zinfo->randomLoopTrial ; i++) {
+    int32_t zeroFound = 1;
+    for (uint32_t i = 0; i < zinfo->randomLoopTrial; i++) {
         int32_t id = DIST->operator()(*RNG);
-        auto it = std::find(MRUList.begin(), MRUList.end(), id);
-        if( it != MRUList.end())
-            continue; // chose an MRU set
         int32_t counts = 0;
         int32_t sizes = 0;
         for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++) {
@@ -1740,7 +1727,6 @@ int32_t ApproximateDedupBDIDataArray::preinsert(uint16_t lineSize) {
             if (tagCounterArray[id][j])
                 sizes += BDICompressionToSize(tagArray->readCompressionEncoding(tagPointerArray[id][j]), zinfo->lineSize);
         }
-
         if (counts == 0)
             panic("Cannot happen");
         if ((assoc*zinfo->lineSize - sizes) >= lineSize)
@@ -1785,61 +1771,39 @@ int32_t ApproximateDedupBDIDataArray::preinsert(int32_t dataId, int32_t* tagId, 
 void ApproximateDedupBDIDataArray::postinsert(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, int32_t segmentId, DataLine data, bool updateReplacement) {
     rp[dataId]->replaced(segmentId);
 
-    if (updateReplacement) {
-        auto it = std::find(MRUList.begin(), MRUList.end(), dataId);
-        if((it != MRUList.end())) {
-            if (MRUList.back() != dataId) {
-                // we have same entry => bring it to the front
-                auto index = std::distance(MRUList.begin(), it);
-                MRUList.erase(MRUList.begin() + index);
-                MRUList.push_back(dataId);
-            }
-        } else {
-            if (MRUList.size() > MRU_SIZE-1) // full size used
-                MRUList.erase(MRUList.begin()); // pop the last one
-            MRUList.push_back(dataId);
+    for (uint32_t i = 0; i < 8; i++) {
+        auto it = std::find(freeList[i].begin(), freeList[i].end(), dataId);
+        if(it != freeList[i].end()) {
+            auto index = std::distance(freeList[i].begin(), it);
+            freeList[i].erase(freeList[i].begin() + index);
+            break;
         }
     }
+
     tagCounterArray[dataId][segmentId] = counter;
     if (tagPointerArray[dataId][segmentId] == -1 && tagId != -1) {
         validLines++;
-        auto it = std::find(freeList.begin(), freeList.end(), dataId);
-        if(it != freeList.end()) {
-            auto index = std::distance(freeList.begin(), it);
-            freeList.erase(freeList.begin() + index);
-        }
     } else if (tagPointerArray[dataId][segmentId] != -1 && tagId == -1) {
         validLines--;
-        int count = 0;
-        for (uint32_t i = 0; i < assoc*zinfo->lineSize/8; i++)
-            count += tagCounterArray[dataId][i];
-        if (!count)
-            freeList.push_back(dataId);
     }
     tagPointerArray[dataId][segmentId] = tagId;
     if (data)
         PIN_SafeCopy(compressedDataArray[dataId][segmentId], data, zinfo->lineSize);
     if (updateReplacement) rp[dataId]->update(segmentId, req);
+
+    int count = assoc*zinfo->lineSize/8;
+    for (uint32_t i = 0; i < assoc*zinfo->lineSize/8; i++)
+        if (tagCounterArray[dataId][i])
+            count--;
+    if (count > 8)
+        count = 8;
+    if (count)
+        freeList[count-1].push_back(dataId);
     // info("Data was %i,%i: %i, %i", dataId, segmentId, tagCounterArray[dataId][segmentId], tagPointerArray[dataId][segmentId]);
     // info("Data is %i,%i: %i, %i", dataId, segmentId, counter, tagId);
 }
 
 void ApproximateDedupBDIDataArray::changeInPlace(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, int32_t segmentId, DataLine data, bool updateReplacement) {
-    if (updateReplacement) {
-        auto it = std::find(MRUList.begin(), MRUList.end(), dataId);
-        if((it != MRUList.end())) {
-            if (MRUList.back() != dataId) {
-                // we have same entry => bring it to the front
-                auto index = std::distance(MRUList.begin(), it);
-                MRUList.erase(MRUList.begin() + index);
-                MRUList.push_back(dataId);
-            }
-        } else {
-            if (MRUList.size() > MRU_SIZE-1) // full size used
-                MRUList.erase(MRUList.begin()); // pop the last one
-            MRUList.push_back(dataId);
-        }
-    }
     tagCounterArray[dataId][segmentId] = counter;
     tagPointerArray[dataId][segmentId] = tagId;
     if (data)
