@@ -1681,6 +1681,7 @@ ApproximateDedupBDIDataArray::ApproximateDedupBDIDataArray(uint32_t _numLines, u
     std::random_device rd;
     RNG = new std::mt19937(rd());
     DIST = new std::uniform_int_distribution<>(0, numSets-1);
+    popped = false;
 
     assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
 }
@@ -1714,6 +1715,7 @@ int32_t ApproximateDedupBDIDataArray::preinsert(uint16_t lineSize) {
         if (freeList[i].size()) {
             leastId = freeList[i].back();
             freeList[i].pop_back();
+            popped = true;
             return leastId;
         }
     }
@@ -1771,12 +1773,14 @@ int32_t ApproximateDedupBDIDataArray::preinsert(int32_t dataId, int32_t* tagId, 
 void ApproximateDedupBDIDataArray::postinsert(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, int32_t segmentId, DataLine data, bool updateReplacement) {
     rp[dataId]->replaced(segmentId);
 
-    for (uint32_t i = 0; i < 8; i++) {
-        auto it = std::find(freeList[i].begin(), freeList[i].end(), dataId);
-        if(it != freeList[i].end()) {
-            auto index = std::distance(freeList[i].begin(), it);
-            freeList[i].erase(freeList[i].begin() + index);
-            break;
+    if (!popped) {
+        for (uint32_t i = 0; i < 8; i++) {
+            auto it = std::find(freeList[i].begin(), freeList[i].end(), dataId);
+            if(it != freeList[i].end()) {
+                auto index = std::distance(freeList[i].begin(), it);
+                freeList[i].erase(freeList[i].begin() + index);
+                break;
+            }
         }
     }
 
@@ -1799,6 +1803,7 @@ void ApproximateDedupBDIDataArray::postinsert(int32_t tagId, const MemReq* req, 
         count = 8;
     if (count)
         freeList[count-1].push_back(dataId);
+    popped = false;
     // info("Data was %i,%i: %i, %i", dataId, segmentId, tagCounterArray[dataId][segmentId], tagPointerArray[dataId][segmentId]);
     // info("Data is %i,%i: %i, %i", dataId, segmentId, counter, tagId);
 }

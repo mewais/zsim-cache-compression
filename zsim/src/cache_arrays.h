@@ -383,6 +383,7 @@ class ApproximateDedupBDIDataArray : public ApproximateBDIDataArray {
         std::uniform_int_distribution<>* DIST;
         g_vector<g_vector<int32_t>> freeList;
         ApproximateDedupBDITagArray* tagArray;
+        bool popped;
 
     public:
         ApproximateDedupBDIDataArray(uint32_t _numLines, uint32_t _assoc, HashFamily* _hf);
