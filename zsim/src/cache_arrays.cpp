@@ -1797,8 +1797,8 @@ void ApproximateDedupBDIDataArray::postinsert(int32_t tagId, const MemReq* req, 
 
     int count = assoc*zinfo->lineSize/8;
     for (uint32_t i = 0; i < assoc*zinfo->lineSize/8; i++)
-        if (tagCounterArray[dataId][i])
-            count--;
+        if (tagPointerArray[dataId][i])
+            count -= BDICompressionToSize(tagArray->readCompressionEncoding(tagPointerArray[dataId][i]), zinfo->lineSize)/8;
     if (count > 8)
         count = 8;
     if (count)
