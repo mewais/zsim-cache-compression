@@ -434,7 +434,7 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
                     // // // info("SHOULDN'T");
                     tagArray->changeInPlace(req.lineAddr, &req, tagId, targetDataId, targetSegmentId, encoding, oldListHead, true);
                     // // info("postinsert %i", tagId);
-                    dataArray->changeInPlace(tagId, &req, dataCounter+1, targetDataId, targetSegmentId, NULL, updateReplacement);
+                    dataArray->changeInPlace(tagId, &req, dataCounter+1, targetDataId, targetSegmentId, NULL, true);
                     uint64_t getDoneCycle = respCycle;
                     respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                     if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -528,7 +528,7 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
                         respCycle = lastEvDoneCycle;
                         // // // info("SHOULD CHANGE");
                         tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement, false);
-                        dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data, updateReplacement);
+                        dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data, true);
                         if (hashId == -1) {
                             DD_HI++;
                             hashId = hashArray->preinsert(hash, &req);
@@ -643,7 +643,7 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
                         // // // info("SHOULD UP");
                         tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement, false);
                         // // info("postinsert %i", tagId);
-                        dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data, updateReplacement);
+                        dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data, true);
                         if (hashId == -1) {
                             DD_HI++;
                             hashId = hashArray->preinsert(hash, &req);
