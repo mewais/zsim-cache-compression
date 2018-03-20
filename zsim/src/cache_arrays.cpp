@@ -1736,7 +1736,7 @@ int32_t ApproximateDedupBDIDataArray::preinsert(uint16_t lineSize) {
         g_vector<uint32_t> keptFromEvictions;
         counts = 0;
         do {
-            int32_t candidate = rp[id]->rank(NULL, SetAssocCands(0, (assoc*zinfo->lineSize/8)-1), keptFromEvictions);
+            int32_t candidate = rp[id]->rank(NULL, SetAssocCands(0, (assoc*zinfo->lineSize/8)), keptFromEvictions);
             if (tagCounterArray[id][candidate])
                 sizes -= BDICompressionToSize(tagArray->readCompressionEncoding(tagPointerArray[id][candidate]), zinfo->lineSize);
             counts += tagCounterArray[id][candidate];
@@ -1763,7 +1763,7 @@ int32_t ApproximateDedupBDIDataArray::preinsert(int32_t dataId, int32_t* tagId, 
             }
         if (Found)
             continue;
-        candidate = rp[dataId]->rank(NULL, SetAssocCands(0, (assoc*zinfo->lineSize/8)-1), exceptions);
+        candidate = rp[dataId]->rank(NULL, SetAssocCands(0, (assoc*zinfo->lineSize/8)), exceptions);
         break;
     }
     *tagId = tagPointerArray[dataId][candidate];
