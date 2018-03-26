@@ -76,6 +76,7 @@ uint64_t TimingCache::access(MemReq& req) {
     if (likely(!skipAccess)) {
         bool updateReplacement = (req.type == GETS) || (req.type == GETX);
         int32_t lineId = array->lookup(req.lineAddr, &req, updateReplacement);
+        // Timing: This is tag latency
         respCycle += accLat;
 
         if (lineId == -1 /*&& cc->shouldAllocate(req)*/) {
@@ -89,7 +90,11 @@ uint64_t TimingCache::access(MemReq& req) {
 
             //Evictions are not in the critical path in any sane implementation -- we do not include their delays
             //NOTE: We might be "evicting" an invalid line for all we know. Coherence controllers will know what to do
-            evDoneCycle = cc->processEviction(req, wbLineAddr, lineId, respCycle); //if needed, send invalidates/downgrades to lower level, and wb to upper level
+            // Timing: Eviction can happen one more accLat after reading the
+            // tag, required to read the data to evict.
+            // Timing: The process access can happen after only tag access
+            // though.
+            evDoneCycle = cc->processEviction(req, wbLineAddr, lineId, respCycle+accLat); //if needed, send invalidates/downgrades to lower level, and wb to upper level
 
             array->postinsert(req.lineAddr, &req, lineId); //do the actual insertion. NOTE: Now we must split insert into a 2-phase thing because cc unlocks us.
 
@@ -98,6 +103,8 @@ uint64_t TimingCache::access(MemReq& req) {
                 Evictions++;
             }
         } else {
+            // Timing: This is the delay for reading tag array
+            respCycle += accLat;
             if (tag_hits) tag_hits->inc();
         }
 
@@ -109,7 +116,7 @@ uint64_t TimingCache::access(MemReq& req) {
         // At this point we have all the info we need to hammer out the timing record
         TimingRecord tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr}; //note the end event is the response, not the wback
 
-        if (getDoneCycle - req.cycle == accLat) {
+        if (getDoneCycle - req.cycle == 2*accLat) {
             // Hit
             assert(!writebackRecord.isValid());
             assert(!accessRecord.isValid());
@@ -173,7 +180,7 @@ uint64_t TimingCache::access(MemReq& req) {
 
             // Eviction path
             if (evDoneCycle) {
-                connect(writebackRecord.isValid()? &writebackRecord : nullptr, mse, mwe, req.cycle + accLat, evDoneCycle);
+                connect(writebackRecord.isValid()? &writebackRecord : nullptr, mse, mwe, req.cycle + 2*accLat, evDoneCycle);
             }
 
             // Replacement path

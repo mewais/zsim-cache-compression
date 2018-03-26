@@ -122,6 +122,7 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
 
         bool updateReplacement = (req.type == GETS) || (req.type == GETX);
         int32_t tagId = tagArray->lookup(req.lineAddr, &req, updateReplacement);
+        // Timing: Tag array access latency.
         respCycle += accLat;
         evictCycle += accLat;
 
@@ -139,6 +140,8 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
             keptFromEvictions.push_back(victimTagId);
             trace(Cache, "[%s] Evicting 0x%lx", name.c_str(), wbLineAddr);
             // Need to evict the tag.
+            // Timing: to evict, need to read the data array too.
+            evictCycle += accLat;
             tagEvDoneCycle = cc->processEviction(req, wbLineAddr, victimTagId, evictCycle);
             // // // info("\t\t\tEviction finished at %lu", tagEvDoneCycle);
             if (evRec->hasRecord()) {
@@ -165,6 +168,8 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
 
             // If the size of evicted line is not enough for the the compressed line
             // evict more
+            // Timing: to evict more, no extra delay is needed, we already
+            // read that line before. we just add 1
             uint64_t evBeginCycle = respCycle + 1;
             int32_t victimTagId2 = tagArray->needEviction(req.lineAddr, &req, lineSize, keptFromEvictions, &wbLineAddr);
             TimingRecord writebackRecord;
@@ -216,7 +221,7 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
             }
             mre->addChild(mwe, evRec);
             if (tagEvDoneCycle) {
-                connect(tagWritebackRecord.isValid()? &tagWritebackRecord : nullptr, mse, mwe, req.cycle + accLat, tagEvDoneCycle);
+                connect(tagWritebackRecord.isValid()? &tagWritebackRecord : nullptr, mse, mwe, req.cycle + 2*accLat, tagEvDoneCycle);
             }
             tr.startEvent = mse;
             tr.endEvent = mre;
@@ -236,6 +241,8 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                 // If size is the same
                 if (lineSize == BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize)) {
                     // info("\t\tSize is the same as before, do nothing.");
+                    // Timing: Data Array access Latency
+                    respCycle += accLat;
                     uint64_t getDoneCycle = respCycle;
                     respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                     if (evRec->hasRecord()) accessRecord = evRec->popRecord();
@@ -247,6 +254,8 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                     tr.startEvent = tr.endEvent = ev;
                 } else if (lineSize < BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize)) {
                     // info("\tSize is smaller than before %i, compacting.", BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize)/8);
+                    // Timing: Data Array access Latency
+                    respCycle += accLat;
                     tagArray->writeCompressionEncoding(tagId, encoding);
                     uint64_t getDoneCycle = respCycle;
                     respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
@@ -262,7 +271,10 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                     // evict more
                     // info("\t\tSize is bigger than before %i", BDICompressionToSize(tagArray->readCompressionEncoding(tagId), zinfo->lineSize)/8);
                     Address wbLineAddr;
-                    uint64_t evBeginCycle = respCycle + 1;
+                    // Timing: evictions cannot start until a read data
+                    // occurs, requiring one more accLat.
+                    respCycle += accLat;
+                    uint64_t evBeginCycle = respCycle;
                     keptFromEvictions.push_back(tagId);
                     int32_t victimTagId = tagArray->needEviction(req.lineAddr, &req, lineSize, keptFromEvictions, &wbLineAddr);
                     TimingRecord writebackRecord;
@@ -290,6 +302,9 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                         }
                         victimTagId = tagArray->needEviction(req.lineAddr, &req, lineSize, keptFromEvictions, &wbLineAddr);
                     }
+                    // Timing: Writing the value requires reading for
+                    // evictions first, then actually writing the new data.
+                    respCycle += accLat;
                     uint64_t getDoneCycle = respCycle;
                     respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                     tagArray->writeCompressionEncoding(tagId, encoding);
@@ -308,9 +323,9 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
 
                     if(wbStartCycles.size()) {
                         for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
-                            DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
+                            DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + 2*accLat));
                             // // // info("uCREATE: %p at %u", del, __LINE__);
-                            del->setMinStartCycle(req.cycle + accLat);
+                            del->setMinStartCycle(req.cycle + 2*accLat);
                             he->addChild(del, evRec);
                             connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
                         }
@@ -321,6 +336,8 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
             } else {
                 // info("\tRead Tag Hit");
                 // // info("Hit Request at tag: %i", tagId);
+                // Timing: Data Array access Latency
+                respCycle += accLat;
                 uint64_t getDoneCycle = respCycle;
                 respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                 if (evRec->hasRecord()) accessRecord = evRec->popRecord();
