@@ -149,6 +149,34 @@ class PrintExpr {
     log_unlock(); \
 }
 
+#ifdef __DEBUG__
+#define debug(args...) \
+{ \
+    log_lock(); \
+    fprintf(logFdOut, "%sDEBUG: ", logHeader); \
+    fprintf(logFdOut, args); \
+    fprintf(logFdOut, "\n"); \
+    fflush(logFdOut); \
+    log_unlock(); \
+}
+#else
+#define debug(args...)
+#endif
+
+#ifdef __TIMING__
+#define timing(args...) \
+{ \
+    log_lock(); \
+    fprintf(logFdOut, "%sTIMING: ", logHeader); \
+    fprintf(logFdOut, args); \
+    fprintf(logFdOut, "\n"); \
+    fflush(logFdOut); \
+    log_unlock(); \
+}
+#else
+#define timing(args...)
+#endif
+
 /* I would call these macros log, but there's this useless math function
  * that happens to conflict with this...
  */

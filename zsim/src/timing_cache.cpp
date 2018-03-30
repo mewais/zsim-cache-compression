@@ -65,6 +65,9 @@ uint64_t TimingCache::access(MemReq& req) {
     EventRecorder* evRec = zinfo->eventRecorders[req.srcId];
     assert_msg(evRec, "TimingCache is not connected to TimingCore");
 
+    timing("%s: received %s req on address %lu on cycle %lu", name.c_str(), AccessTypeName(req.type), req.lineAddr, req.cycle);
+    debug("%s: received %s req on address %lu on cycle %lu", name.c_str(), AccessTypeName(req.type), req.lineAddr, req.cycle);
+
     TimingRecord writebackRecord, accessRecord;
     writebackRecord.clear();
     accessRecord.clear();
@@ -78,6 +81,7 @@ uint64_t TimingCache::access(MemReq& req) {
         int32_t lineId = array->lookup(req.lineAddr, &req, updateReplacement);
         // Timing: This is tag latency
         respCycle += accLat;
+        timing("%s: tag accessed on cycle %lu", name.c_str(), respCycle);
 
         if (lineId == -1 /*&& cc->shouldAllocate(req)*/) {
             if (tag_misses) tag_misses->inc();
@@ -86,7 +90,7 @@ uint64_t TimingCache::access(MemReq& req) {
             //Make space for new line
             Address wbLineAddr;
             lineId = array->preinsert(req.lineAddr, &req, &wbLineAddr); //find the lineId to replace
-            trace(Cache, "[%s] Evicting 0x%lx", name.c_str(), wbLineAddr);
+            debug("%s: tag miss, inserting into line %i", name.c_str(), lineId);
 
             //Evictions are not in the critical path in any sane implementation -- we do not include their delays
             //NOTE: We might be "evicting" an invalid line for all we know. Coherence controllers will know what to do
@@ -94,22 +98,29 @@ uint64_t TimingCache::access(MemReq& req) {
             // tag, required to read the data to evict.
             // Timing: The process access can happen after only tag access
             // though.
+            timing("%s: tag access missed, evicting address %lu on cycle %lu", name.c_str(), wbLineAddr, respCycle+accLat);
             evDoneCycle = cc->processEviction(req, wbLineAddr, lineId, respCycle+accLat); //if needed, send invalidates/downgrades to lower level, and wb to upper level
+            timing("%s: finished eviction on cycle %lu", name.c_str(), evDoneCycle);
 
             array->postinsert(req.lineAddr, &req, lineId); //do the actual insertion. NOTE: Now we must split insert into a 2-phase thing because cc unlocks us.
 
             if (evRec->hasRecord()) {
                 writebackRecord = evRec->popRecord();
                 Evictions++;
+                debug("%s: tag miss caused eviction of address %lu", name.c_str(), wbLineAddr);
             }
         } else {
             // Timing: This is the delay for reading tag array
             respCycle += accLat;
+            debug("%s: tag hit on line %i", name.c_str(), lineId);
+            timing("%s: tag access hit, reading data on cycle %lu", name.c_str(), respCycle);
             if (tag_hits) tag_hits->inc();
         }
 
         uint64_t getDoneCycle = respCycle;
+        timing("%s: doing processAccess on cycle %lu", name.c_str(), respCycle);
         respCycle = cc->processAccess(req, lineId, respCycle, &getDoneCycle);
+        timing("%s: finished processAccess on cycle %lu", name.c_str(), respCycle);
 
         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
 
@@ -123,6 +134,7 @@ uint64_t TimingCache::access(MemReq& req) {
             uint64_t hitLat = respCycle - req.cycle; // accLat + invLat
             HitEvent* ev = new (evRec) HitEvent(this, hitLat, domain);
             ev->setMinStartCycle(req.cycle);
+            timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, hitLat);
             tr.startEvent = tr.endEvent = ev;
         } else {
             assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
@@ -137,6 +149,9 @@ uint64_t TimingCache::access(MemReq& req) {
             mse->setMinStartCycle(req.cycle);
             mre->setMinStartCycle(getDoneCycle);
             mwe->setMinStartCycle(MAX(evDoneCycle, getDoneCycle));
+            timing("%s: missStartEvent Min Start: %lu, duration: %u", name.c_str(), req.cycle, accLat);
+            timing("%s: missResponseEvent Min Start: %lu", name.c_str(), getDoneCycle);
+            timing("%s: missWritebackEvent Min Start: %lu, duration: %u", name.c_str(), MAX(evDoneCycle, getDoneCycle), accLat);
 
             // Tie two events to an optional timing record
             // TODO: Promote to evRec if this is more generally useful
@@ -180,7 +195,7 @@ uint64_t TimingCache::access(MemReq& req) {
 
             // Eviction path
             if (evDoneCycle) {
-                connect(writebackRecord.isValid()? &writebackRecord : nullptr, mse, mwe, req.cycle + 2*accLat, evDoneCycle);
+                connect(writebackRecord.isValid()? &writebackRecord : nullptr, mse, mwe, req.cycle + accLat, evDoneCycle);
             }
 
             // Replacement path
