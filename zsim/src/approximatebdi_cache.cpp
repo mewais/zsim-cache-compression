@@ -215,7 +215,10 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
             }
             mre->addChild(mwe, evRec);
             if (tagEvDoneCycle) {
-                connect(tagWritebackRecord.isValid()? &tagWritebackRecord : nullptr, mse, mwe, req.cycle + 2*accLat, tagEvDoneCycle);
+                DelayEvent* del = new (evRec) DelayEvent(accLat);
+                del->setMinStartCycle(req.cycle + accLat);
+                mse->addChild(del, evRec);
+                connect(tagWritebackRecord.isValid()? &tagWritebackRecord : nullptr, del, mwe, req.cycle + 2*accLat, tagEvDoneCycle);
             }
             tr.startEvent = mse;
             tr.endEvent = mre;

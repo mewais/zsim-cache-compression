@@ -257,6 +257,7 @@ uint64_t DDRMemory::access(MemReq& req) {
     }
 
     if (req.type == PUTS) {
+        timing("%s: received useless PUTS on address %lu request at cycle %lu.", name.c_str(), req.lineAddr, req.cycle);
         return req.cycle; //must return an absolute value, 0 latency
     } else {
         bool isWrite = (req.type == PUTX);
@@ -264,12 +265,12 @@ uint64_t DDRMemory::access(MemReq& req) {
         if (zinfo->eventRecorders[req.srcId]) {
             DDRMemoryAccEvent* memEv = new (zinfo->eventRecorders[req.srcId]) DDRMemoryAccEvent(this,
                     isWrite, req.lineAddr, domain, preDelay, isWrite? postDelayWr : postDelayRd);
-            // // info("dCREATE: %p", memEv);
             memEv->setMinStartCycle(req.cycle);
             TimingRecord tr = {req.lineAddr, req.cycle, respCycle, req.type, memEv, memEv};
             zinfo->eventRecorders[req.srcId]->pushRecord(tr);
         }
         //info("Access to %lx at %ld, %ld latency", req.lineAddr, req.cycle, minLatency);
+        timing("%s: received %s request on address %lu at cycle %lu and returned at cycle %lu", name.c_str(), AccessTypeName(req.type), req.lineAddr, req.cycle, respCycle);
         return respCycle;
     }
 }
