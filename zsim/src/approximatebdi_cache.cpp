@@ -207,7 +207,6 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
             if(wbStartCycles.size()) {
                 for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                     DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - respCycle);
-                    // // // info("uCREATE: %p at %u", del, __LINE__);
                     del->setMinStartCycle(respCycle);
                     mre->addChild(del, evRec);
                     connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, mwe, wbStartCycles[i], wbEndCycles[i]);
@@ -298,9 +297,6 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                         tagArray->postinsert(0, &req, victimTagId, -1, NONE, false, false);
                         victimTagId = tagArray->needEviction(req.lineAddr, &req, lineSize, keptFromEvictions, &wbLineAddr);
                     }
-                    // Timing: Writing the value requires reading for
-                    // evictions first, then actually writing the new data.
-                    respCycle += accLat;
                     timing("%s: writing data on cycle %lu", name.c_str(), respCycle);
                     uint64_t getDoneCycle = respCycle;
                     timing("%s: doing processAccess on cycle %lu", name.c_str(), respCycle);
@@ -311,12 +307,14 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                     tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
 
                     HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
-                    aHitWritebackEvent* hwe = new (evRec) aHitWritebackEvent(this, he, respCycle - req.cycle, domain);
+                    // Timing: Writing the value requires reading for
+                    // evictions first, then actually writing the new data.
+                    aHitWritebackEvent* hwe = new (evRec) aHitWritebackEvent(this, he, accLat, domain);
 
                     he->setMinStartCycle(req.cycle);
                     hwe->setMinStartCycle(lastEvDoneCycle);
                     timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                    timing("%s: hitWritebackEvent Min Start: %lu, duration: %lu", name.c_str(), lastEvDoneCycle, respCycle - req.cycle);
+                    timing("%s: hitWritebackEvent Min Start: %lu, duration: %lu", name.c_str(), lastEvDoneCycle, accLat);
 
                     if(wbStartCycles.size()) {
                         for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
