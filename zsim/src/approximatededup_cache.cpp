@@ -131,8 +131,6 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
     uint64_t respCycle = req.cycle;
     uint64_t evictCycle = req.cycle;
 
-    g_vector<uint32_t> keptFromEvictions;
-
     bool skipAccess = cc->startAccess(req); //may need to skip access due to races (NOTE: may change req.type!)
     if (likely(!skipAccess)) {
         bool updateReplacement = (req.type == GETS) || (req.type == GETX);
@@ -153,7 +151,6 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
             Address wbLineAddr;
             int32_t victimTagId = tagArray->preinsert(req.lineAddr, &req, &wbLineAddr); //find the lineId to replace
             debug("%s: tag miss, inserting into line %i", name.c_str(), tagId);
-            keptFromEvictions.push_back(victimTagId);
             // Need to evict the tag.
             // Timing: to evict, need to read the data array too.
             evictCycle += accLat;
@@ -803,6 +800,8 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
             } else {
                 debug("%s: read hit, or write same data.", name.c_str());
                 WSR_TH++;
+                respCycle += accLat;
+                timing("%s: reading data on cycle %lu", name.c_str(), respCycle);
                 dataArray->lookup(tagArray->readDataId(tagId), &req, updateReplacement);
                 uint64_t getDoneCycle = respCycle;
                 timing("%s: doing processAccess on cycle %lu", name.c_str(), respCycle);
