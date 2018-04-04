@@ -314,7 +314,7 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                     he->setMinStartCycle(req.cycle);
                     hwe->setMinStartCycle(lastEvDoneCycle);
                     timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                    timing("%s: hitWritebackEvent Min Start: %lu, duration: %lu", name.c_str(), lastEvDoneCycle, accLat);
+                    timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), lastEvDoneCycle, accLat);
 
                     if(wbStartCycles.size()) {
                         for(uint32_t i = 0; i < wbStartCycles.size(); i++) {

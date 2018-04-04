@@ -670,7 +670,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         he->setMinStartCycle(req.cycle);
                         hwe->setMinStartCycle(respCycle);
                         timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %lu", name.c_str(), respCycle, 3*accLat);
+                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
 
                         if(wbStartCycles.size()) {
                             for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
@@ -723,7 +723,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         he->setMinStartCycle(req.cycle);
                         hwe->setMinStartCycle(respCycle);
                         timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %lu", name.c_str(), respCycle, 3*accLat);
+                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
                         tr.startEvent = tr.endEvent = he;
                     } else {
                         debug("%s: Found matching hash at %i pointing to different data line %i, segment %i. collision.", name.c_str(), hashId, targetDataId, targetSegmentId);
@@ -827,7 +827,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             he->setMinStartCycle(req.cycle);
                             hwe->setMinStartCycle(lastEvDoneCycle);
                             timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                            timing("%s: hitWritebackEvent Min Start: %lu, duration: %lu", name.c_str(), respCycle, 3*accLat);
+                            timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
                             if(wbStartCycles.size()) {
                                 for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                                     DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
@@ -935,7 +935,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             he->setMinStartCycle(req.cycle);
                             hwe->setMinStartCycle(lastEvDoneCycle);
                             timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                            timing("%s: hitWritebackEvent Min Start: %lu, duration: %lu", name.c_str(), respCycle, 3*accLat);
+                            timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
                             if(wbStartCycles.size()) {
                                 for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                                     DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
@@ -1050,7 +1050,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         he->setMinStartCycle(req.cycle);
                         hwe->setMinStartCycle(lastEvDoneCycle);
                         timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %lu", name.c_str(), respCycle, 3*accLat);
+                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
                         if(wbStartCycles.size()) {
                             for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                                 DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
@@ -1161,7 +1161,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         he->setMinStartCycle(req.cycle);
                         hwe->setMinStartCycle(lastEvDoneCycle);
                         timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %lu", name.c_str(), respCycle, 3*accLat);
+                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
                         if(wbStartCycles.size()) {
                             for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                                 DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));

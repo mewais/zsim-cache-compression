@@ -163,6 +163,7 @@ class PrintExpr {
 #define debug(args...)
 #endif
 
+#define __TIMING__
 #ifdef __TIMING__
 #define timing(args...) \
 { \

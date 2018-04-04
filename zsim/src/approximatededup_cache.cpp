@@ -477,7 +477,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         he->setMinStartCycle(req.cycle);
                         hwe->setMinStartCycle(respCycle);
                         timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %lu", name.c_str(), respCycle, 3*accLat);
+                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
                         if(wbStartCycles.size()) {
                             for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                                 DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
@@ -530,7 +530,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         he->setMinStartCycle(req.cycle);
                         hwe->setMinStartCycle(respCycle);
                         timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %lu", name.c_str(), respCycle, 3*accLat);
+                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
 
                         if(wbStartCycles.size()) {
                             for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
@@ -566,7 +566,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             he->setMinStartCycle(req.cycle);
                             hwe->setMinStartCycle(respCycle);
                             timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                            timing("%s: hitWritebackEvent Min Start: %lu, duration: %lu", name.c_str(), respCycle, 3*accLat);
+                            timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
                             if(wbStartCycles.size()) {
                                 for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                                     DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
@@ -657,7 +657,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             he->setMinStartCycle(req.cycle);
                             hwe->setMinStartCycle(lastEvDoneCycle);
                             timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                            timing("%s: hitWritebackEvent Min Start: %lu, duration: %lu", name.c_str(), respCycle, 3*accLat);
+                            timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
                             if(wbStartCycles.size()) {
                                 for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                                     DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
@@ -694,7 +694,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         he->setMinStartCycle(req.cycle);
                         hwe->setMinStartCycle(respCycle);
                         timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %lu", name.c_str(), respCycle, 2*accLat);
+                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 2*accLat);
                         if(wbStartCycles.size()) {
                             for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                                 DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
@@ -784,7 +784,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         he->setMinStartCycle(req.cycle);
                         hwe->setMinStartCycle(lastEvDoneCycle);
                         timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %lu", name.c_str(), respCycle, 2*accLat);
+                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 2*accLat);
                         if(wbStartCycles.size()) {
                             for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                                 DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
