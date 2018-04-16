@@ -82,8 +82,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
     bool approximate = false;
     uint64_t Evictions = 0;
     uint64_t readAddress = req.lineAddr;
-    if (zinfo->realAddresses->find(req.lineAddr) != zinfo->realAddresses->end())
-        readAddress = (*zinfo->realAddresses)[req.lineAddr];
     for(uint32_t i = 0; i < zinfo->approximateRegions->size(); i++) {
         if ((readAddress << lineBits) >= std::get<0>((*zinfo->approximateRegions)[i]) && (readAddress << lineBits) <= std::get<1>((*zinfo->approximateRegions)[i])
         && (readAddress << lineBits)+zinfo->lineSize-1 >= std::get<0>((*zinfo->approximateRegions)[i]) && (readAddress << lineBits)+zinfo->lineSize-1 <= std::get<1>((*zinfo->approximateRegions)[i])) {
@@ -113,7 +111,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
 
             if (upLat) {
                 DelayEvent* dUp = new (evRec) DelayEvent(upLat);
-                // // // info("uCREATE: %p at %u", dUp, __LINE__);
                 dUp->setMinStartCycle(startCycle);
                 startEv->addChild(dUp, evRec)->addChild(r->startEvent, evRec);
             } else {
@@ -122,7 +119,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
 
             if (downLat) {
                 DelayEvent* dDown = new (evRec) DelayEvent(downLat);
-                // // // info("uCREATE: %p at %u", dDown, __LINE__);
                 dDown->setMinStartCycle(r->respCycle);
                 r->endEvent->addChild(dDown, evRec)->addChild(endEv, evRec);
             } else {
@@ -133,7 +129,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                 startEv->addChild(endEv, evRec);
             } else {
                 DelayEvent* dEv = new (evRec) DelayEvent(endCycle - startCycle);
-                // // // info("uCREATE: %p at %u", dEv, __LINE__);
                 dEv->setMinStartCycle(startCycle);
                 startEv->addChild(dEv, evRec)->addChild(endEv, evRec);
             }
@@ -242,7 +237,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     uint64_t lastEvDoneCycle = evictCycle;
                     uint64_t evBeginCycle = evictCycle;
                     dataId = dataArray->preinsert(lineSize);
-                    debug("%s: Picked victim data line %i", dataId);
+                    debug("%s: Picked victim data line %i", name.c_str(), dataId);
                     do {
                         uint16_t occupiedSpace = 0;
                         for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
@@ -262,15 +257,17 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         lastEvDoneCycle = tagEvDoneCycle;
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                         bool started = false;
+                        Address wbLineAddr;
                         while (victimListHeadId != -1) {
                             if (victimListHeadId != victimTagId) {
-                                Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                                wbLineAddr = tagArray->readAddress(victimListHeadId);
                                 timing("%s: doing size/dedup eviction for address %lu on cycle %lu", name.c_str(), wbLineAddr, evBeginCycle);
                                 evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
                                 timing("%s: size/dedup eviction finished on cycle %lu", name.c_str(), evDoneCycle);
                                 newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                 tagArray->postinsert(0, &req, victimListHeadId, -1, -1, NONE, -1, false);
                             } else {
+                                wbLineAddr = 0;
                                 newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                             }
                             if (evRec->hasRecord()) {
@@ -390,15 +387,17 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         lastEvDoneCycle = tagEvDoneCycle;
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                         bool started = false;
+                        Address wbLineAddr;
                         while (victimListHeadId != -1) {
                             if (victimListHeadId != victimTagId) {
-                                Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                                wbLineAddr = tagArray->readAddress(victimListHeadId);
                                 timing("%s: doing size/dedup eviction for address %lu on cycle %lu", name.c_str(), wbLineAddr, evBeginCycle);
                                 evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
                                 timing("%s: size/dedup eviction finished on cycle %lu", name.c_str(), evDoneCycle);
                                 newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                 tagArray->postinsert(0, &req, victimListHeadId, -1, -1, NONE, -1, false);
                             } else {
+                                wbLineAddr = 0;
                                 newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                             }
                             if (evRec->hasRecord()) {
@@ -490,15 +489,17 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     lastEvDoneCycle = tagEvDoneCycle;
                     if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                     bool started = false;
+                    Address wbLineAddr;
                     while (victimListHeadId != -1) {
                         if (victimListHeadId != victimTagId) {
-                            Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                            wbLineAddr = tagArray->readAddress(victimListHeadId);
                             timing("%s: doing size/dedup eviction for address %lu on cycle %lu", name.c_str(), wbLineAddr, evBeginCycle);
                             evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
                             timing("%s: size/dedup eviction finished on cycle %lu", name.c_str(), evDoneCycle);
                             newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                             tagArray->postinsert(0, &req, victimListHeadId, -1, -1, NONE, -1, false);
                         } else {
+                            wbLineAddr = 0;
                             newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                         }
                         if (evRec->hasRecord()) {
@@ -559,7 +560,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
             tr.endEvent = mre;
         } else {
             if (tag_hits) tag_hits->inc();
-            debug("%s: tag hit on line %i", name.c_str(), lineId);
+            debug("%s: tag hit on line %i", name.c_str(), tagId);
             zinfo->tagHits++;
             if(approximate)
                 hashArray->approximate(data, type);
@@ -600,11 +601,13 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         // means we need to read it's data, then tag
                         // first.
                         evictCycle = respCycle + 2*accLat;
+                        timing("%s: Read victim line for eviction on cycle %lu", name.c_str(), evictCycle);
                         uint16_t freeSpace = 0;
                         g_vector<uint32_t> keptFromEvictions;
+                        uint64_t lastEvDoneCycle = tagEvDoneCycle;
                         uint64_t evBeginCycle = evictCycle;
                         targetDataId = dataArray->preinsert(lineSize);
-                        debug("%s: Picked victim data line %i", targetDataId);
+                        debug("%s: Picked victim data line %i", name.c_str(), targetDataId);
                         do {
                             uint16_t occupiedSpace = 0;
                             for (uint32_t i = 0; i < dataArray->getAssoc()*zinfo->lineSize/8; i++)
@@ -623,15 +626,17 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             TimingRecord writebackRecord;
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             bool started = false;
+                            Address wbLineAddr;
                             while (victimListHeadId != -1) {
                                 if (victimListHeadId != tagId) {
-                                    Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                                    wbLineAddr = tagArray->readAddress(victimListHeadId);
                                     timing("%s: doing size/dedup eviction for address %lu on cycle %lu", name.c_str(), wbLineAddr, evBeginCycle);
                                     evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
                                     timing("%s: size/dedup eviction finished on cycle %lu", name.c_str(), evDoneCycle);
                                     newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                     tagArray->postinsert(0, &req, victimListHeadId, -1, -1, NONE, -1, false);
                                 } else {
+                                    wbLineAddr = 0;
                                     newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                 }
                                 if (evRec->hasRecord()) {
@@ -646,6 +651,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                     writebackRecords.push_back(writebackRecord);
                                     wbStartCycles.push_back(evBeginCycle);
                                     wbEndCycles.push_back(evDoneCycle);
+                                    lastEvDoneCycle = evDoneCycle;
                                     evBeginCycle += accLat;
                                 }
                                 victimListHeadId = newVictimListHeadId;
@@ -662,23 +668,21 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                         tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                         HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
+                        he->setMinStartCycle(req.cycle);
+                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                         // Timing: even though this is a hit, we need to figure out if the
                         // line has changed from before. requires extra accLat to read
                         // data line. then two more accLats to find that a
                         // line is invalid and to actually write to it.
                         dbHitWritebackEvent* hwe = new (evRec) dbHitWritebackEvent(this, he, 3*accLat, domain);
-                        he->setMinStartCycle(req.cycle);
-                        hwe->setMinStartCycle(respCycle);
-                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
+                        hwe->setMinStartCycle(lastEvDoneCycle);
+                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), lastEvDoneCycle, 3*accLat);
 
-                        if(wbStartCycles.size()) {
-                            for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
-                                DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                                del->setMinStartCycle(req.cycle + accLat);
-                                he->addChild(del, evRec);
-                                connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
-                            }
+                        for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
+                            DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
+                            del->setMinStartCycle(req.cycle + accLat);
+                            he->addChild(del, evRec);
+                            connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
                         }
                         he->addChild(hwe, evRec);
                         tr.startEvent = tr.endEvent = he;
@@ -715,15 +719,16 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                         tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                         HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
+                        he->setMinStartCycle(req.cycle);
+                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                         // Timing: even though this is a hit, we need to figure out if the
                         // line has changed from before. requires extra accLat to read
                         // data line. then two more accLats to find that a
                         // line is similar and to actually update its dedup.
                         dbHitWritebackEvent* hwe = new (evRec) dbHitWritebackEvent(this, he, 3*accLat, domain);
-                        he->setMinStartCycle(req.cycle);
                         hwe->setMinStartCycle(respCycle);
-                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                         timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
+                        he->addChild(hwe, evRec);
                         tr.startEvent = tr.endEvent = he;
                     } else {
                         debug("%s: Found matching hash at %i pointing to different data line %i, segment %i. collision.", name.c_str(), hashId, targetDataId, targetSegmentId);
@@ -731,6 +736,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         segmentId = tagArray->readSegmentPointer(tagId);
                         if (dataArray->readCounter(dataId, segmentId) == 1) {
                             WD_TH_HH_DD_1++;
+                            debug("%s: line was not deduplicated", name.c_str());
                             int32_t newLLHead;
                             bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead);
                             if (evictDataLine) {
@@ -757,7 +763,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             debug("%s: Picked victim data line %i", name.c_str(), victimDataId);
                             uint16_t freeSpace = 0;
                             g_vector<uint32_t> keptFromEvictions;
-                            uint64_t lastEvDoneCycle = evictCycle;
+                            uint64_t lastEvDoneCycle = tagEvDoneCycle;
                             uint64_t evBeginCycle = evictCycle;
                             do {
                                 uint16_t occupiedSpace = 0;
@@ -775,18 +781,19 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 keptFromEvictions.push_back(victimSegmentId);
                                 uint64_t evDoneCycle = evBeginCycle;
                                 TimingRecord writebackRecord;
-                                lastEvDoneCycle = evBeginCycle;
                                 if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                                 bool started = false;
+                                Address wbLineAddr;
                                 while (victimListHeadId != -1) {
                                     if (victimListHeadId != tagId) {
-                                        Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                                        wbLineAddr = tagArray->readAddress(victimListHeadId);
                                         timing("%s: doing size/dedup eviction for address %lu on cycle %lu", name.c_str(), wbLineAddr, evBeginCycle);
                                         evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
                                         timing("%s: size/dedup eviction finished on cycle %lu", name.c_str(), evDoneCycle);
                                         newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                         tagArray->postinsert(0, &req, victimListHeadId, -1, -1, NONE, -1, false);
                                     } else {
+                                        wbLineAddr = 0;
                                         newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                     }
                                     if (evRec->hasRecord()) {
@@ -819,27 +826,27 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                             HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
+                            he->setMinStartCycle(req.cycle);
+                            timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                             // Timing: even though this is a hit, we need to figure out if the
                             // line has changed from before. requires extra accLat to read
                             // data line. then two more accLats to find that a
                             // line is colliding and to actually overwrite another.
                             dbHitWritebackEvent* hwe = new (evRec) dbHitWritebackEvent(this, he, 3*accLat, domain);
-                            he->setMinStartCycle(req.cycle);
                             hwe->setMinStartCycle(lastEvDoneCycle);
-                            timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                            timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
-                            if(wbStartCycles.size()) {
-                                for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
-                                    DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                                    del->setMinStartCycle(req.cycle + accLat);
-                                    he->addChild(del, evRec);
-                                    connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
-                                }
+                            timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), lastEvDoneCycle, 3*accLat);
+
+                            for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
+                                DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
+                                del->setMinStartCycle(req.cycle + accLat);
+                                he->addChild(del, evRec);
+                                connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
                             }
                             he->addChild(hwe, evRec);
                             tr.startEvent = tr.endEvent = he;
                         } else {
                             WD_TH_HH_DD_M++;
+                            debug("%s: line was deduplicated", name.c_str());
                             int32_t newLLHead;
                             bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead);
                             if (evictDataLine) {
@@ -865,7 +872,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             uint16_t freeSpace = 0;
                             g_vector<uint32_t> keptFromEvictions;
                             evictCycle += accLat;
-                            uint64_t lastEvDoneCycle = evictCycle;
+                            uint64_t lastEvDoneCycle = tagEvDoneCycle;
                             uint64_t evBeginCycle = evictCycle;
                             do {
                                 uint16_t occupiedSpace = 0;
@@ -883,18 +890,19 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                                 keptFromEvictions.push_back(victimSegmentId);
                                 uint64_t evDoneCycle = evBeginCycle;
                                 TimingRecord writebackRecord;
-                                lastEvDoneCycle = evBeginCycle;
                                 if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                                 bool started = false;
+                                Address wbLineAddr;
                                 while (victimListHeadId != -1) {
                                     if (victimListHeadId != tagId) {
-                                        Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                                        wbLineAddr = tagArray->readAddress(victimListHeadId);
                                         timing("%s: doing size/dedup eviction for address %lu on cycle %lu", name.c_str(), wbLineAddr, evBeginCycle);
                                         evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
                                         timing("%s: size/dedup eviction finished on cycle %lu", name.c_str(), evDoneCycle);
                                         newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                         tagArray->postinsert(0, &req, victimListHeadId, -1, -1, NONE, -1, false);
                                     } else {
+                                        wbLineAddr = 0;
                                         newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                     }
                                     if (evRec->hasRecord()) {
@@ -927,23 +935,22 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                             HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
+                            he->setMinStartCycle(req.cycle);
+                            timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                             // Timing: even though this is a hit, we need to figure out if the
                             // line has changed from before. requires extra accLat to read
                             // data line. then two more accLats to find that a
                             // line is colliding and to actually overwrite another.
                             dbHitWritebackEvent* hwe = new (evRec) dbHitWritebackEvent(this, he, 3*accLat, domain);
-                            he->setMinStartCycle(req.cycle);
                             hwe->setMinStartCycle(lastEvDoneCycle);
-                            timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                            timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
-                            if(wbStartCycles.size()) {
-                                for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
-                                    DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                                    // // // info("uCREATE: %p at %u", del, __LINE__);
-                                    del->setMinStartCycle(req.cycle + accLat);
-                                    he->addChild(del, evRec);
-                                    connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
-                                }
+                            timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), lastEvDoneCycle, 3*accLat);
+
+                            for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
+                                DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
+                                // // // info("uCREATE: %p at %u", del, __LINE__);
+                                del->setMinStartCycle(req.cycle + accLat);
+                                he->addChild(del, evRec);
+                                connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
                             }
                             he->addChild(hwe, evRec);
                             tr.startEvent = tr.endEvent = he;
@@ -953,6 +960,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                     debug("%s: Found no matching hash.", name.c_str());
                     if (dataArray->readCounter(dataId, segmentId) == 1) {
                         WD_TH_HM_1++;
+                        debug("%s: line was not deduplicated", name.c_str());
                         int32_t newLLHead;
                         bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead);
                         if (evictDataLine) {
@@ -979,7 +987,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         debug("%s: Picked victim data line %i", name.c_str(), victimDataId);
                         uint16_t freeSpace = 0;
                         g_vector<uint32_t> keptFromEvictions;
-                        uint64_t lastEvDoneCycle = evictCycle;
+                        uint64_t lastEvDoneCycle = tagEvDoneCycle;
                         uint64_t evBeginCycle = evictCycle;
                         do {
                             uint16_t occupiedSpace = 0;
@@ -997,18 +1005,19 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             keptFromEvictions.push_back(victimSegmentId);
                             uint64_t evDoneCycle = evBeginCycle;
                             TimingRecord writebackRecord;
-                            lastEvDoneCycle = evBeginCycle;
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             bool started = false;
+                            Address wbLineAddr;
                             while (victimListHeadId != -1) {
                                 if (victimListHeadId != tagId) {
-                                    Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                                    wbLineAddr = tagArray->readAddress(victimListHeadId);
                                     timing("%s: doing size/dedup eviction for address %lu on cycle %lu", name.c_str(), wbLineAddr, evBeginCycle);
                                     evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
                                     timing("%s: size/dedup eviction finished on cycle %lu", name.c_str(), evDoneCycle);
                                     newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                     tagArray->postinsert(0, &req, victimListHeadId, -1, -1, NONE, -1, false);
                                 } else {
+                                    wbLineAddr = 0;
                                     newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                 }
                                 if (evRec->hasRecord()) {
@@ -1042,27 +1051,27 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                         tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                         HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
+                        he->setMinStartCycle(req.cycle);
+                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                         // Timing: even though this is a hit, we need to figure out if the
                         // line has changed from before. requires extra accLat to read
                         // data line. then two more accLats to find that a
                         // line is colliding and to actually overwrite another.
                         dbHitWritebackEvent* hwe = new (evRec) dbHitWritebackEvent(this, he, 3*accLat, domain);
-                        he->setMinStartCycle(req.cycle);
                         hwe->setMinStartCycle(lastEvDoneCycle);
-                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
-                        if(wbStartCycles.size()) {
-                            for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
-                                DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                                del->setMinStartCycle(req.cycle + accLat);
-                                he->addChild(del, evRec);
-                                connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
-                            }
+                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), lastEvDoneCycle, 3*accLat);
+
+                        for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
+                            DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
+                            del->setMinStartCycle(req.cycle + accLat);
+                            he->addChild(del, evRec);
+                            connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
                         }
                         he->addChild(hwe, evRec);
                         tr.startEvent = tr.endEvent = he;
                     } else {
                         WD_TH_HM_M++;
+                        debug("%s: line was deduplicated", name.c_str());
                         // Data exists more than once, evict from LL.
                         // // info("PUTX more than once");
                         int32_t newLLHead;
@@ -1089,7 +1098,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         debug("%s: Picked victim data line %i", name.c_str(), victimDataId);
                         uint16_t freeSpace = 0;
                         g_vector<uint32_t> keptFromEvictions;
-                        uint64_t lastEvDoneCycle = evictCycle;
+                        uint64_t lastEvDoneCycle = tagEvDoneCycle;
                         uint64_t evBeginCycle = evictCycle;
                         do {
                             uint16_t occupiedSpace = 0;
@@ -1107,18 +1116,19 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                             keptFromEvictions.push_back(victimSegmentId);
                             uint64_t evDoneCycle = evBeginCycle;
                             TimingRecord writebackRecord;
-                            lastEvDoneCycle = evBeginCycle;
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             bool started = false;
+                            Address wbLineAddr;
                             while (victimListHeadId != -1) {
                                 if (victimListHeadId != tagId) {
-                                    Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                                    wbLineAddr = tagArray->readAddress(victimListHeadId);
                                     timing("%s: doing size/dedup eviction for address %lu on cycle %lu", name.c_str(), wbLineAddr, evBeginCycle);
                                     evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
                                     timing("%s: size/dedup eviction finished on cycle %lu", name.c_str(), evDoneCycle);
                                     newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                     tagArray->postinsert(0, &req, victimListHeadId, -1, -1, NONE, -1, false);
                                 } else {
+                                    wbLineAddr = 0;
                                     newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                 }
                                 if (evRec->hasRecord()) {
@@ -1153,22 +1163,21 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
 
                         HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
+                        he->setMinStartCycle(req.cycle);
+                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                         // Timing: even though this is a hit, we need to figure out if the
                         // line has changed from before. requires extra accLat to read
                         // data line. then two more accLats to find that a
                         // line is colliding and to actually overwrite another.
                         dbHitWritebackEvent* hwe = new (evRec) dbHitWritebackEvent(this, he, 3*accLat, domain);
-                        he->setMinStartCycle(req.cycle);
                         hwe->setMinStartCycle(lastEvDoneCycle);
-                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
-                        if(wbStartCycles.size()) {
-                            for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
-                                DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                                del->setMinStartCycle(req.cycle + accLat);
-                                he->addChild(del, evRec);
-                                connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
-                            }
+                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), lastEvDoneCycle, 3*accLat);
+
+                        for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
+                            DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
+                            del->setMinStartCycle(req.cycle + accLat);
+                            he->addChild(del, evRec);
+                            connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
                         }
                         he->addChild(hwe, evRec);
                         tr.startEvent = tr.endEvent = he;
@@ -1187,8 +1196,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                 if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                 tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                 HitEvent* ev = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
-                // // // info("uCREATE: %p at %u", ev, __LINE__);
-                // // // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
                 ev->setMinStartCycle(req.cycle);
                 tr.startEvent = tr.endEvent = ev;
             }

@@ -66,8 +66,6 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
     bool approximate = false;
     uint64_t Evictions = 0;
     uint64_t readAddress = req.lineAddr;
-    if (zinfo->realAddresses->find(req.lineAddr) != zinfo->realAddresses->end())
-        readAddress = (*zinfo->realAddresses)[req.lineAddr];
     for(uint32_t i = 0; i < zinfo->approximateRegions->size(); i++) {
         if ((readAddress << lineBits) >= std::get<0>((*zinfo->approximateRegions)[i]) && (readAddress << lineBits) <= std::get<1>((*zinfo->approximateRegions)[i])
         && (readAddress << lineBits)+zinfo->lineSize-1 >= std::get<0>((*zinfo->approximateRegions)[i]) && (readAddress << lineBits)+zinfo->lineSize-1 <= std::get<1>((*zinfo->approximateRegions)[i])) {
@@ -298,6 +296,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
                         } else
                         {
+                            wbLineAddr = 0;
                             newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                         }
                         if (evRec->hasRecord()) {
@@ -427,7 +426,7 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
             tr.endEvent = mre;
         } else {
             if (tag_hits) tag_hits->inc();
-            debug("%s: tag hit on line %i", name.c_str(), lineId);
+            debug("%s: tag hit on line %i", name.c_str(), tagId);
             zinfo->tagHits++;
             if(approximate)
                 hashArray->approximate(data, type);
@@ -469,22 +468,21 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
 
                         HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
+                        he->setMinStartCycle(req.cycle);
+                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                         // Timing: even though this is a hit, we need to figure out if the
                         // line has changed from before. requires extra accLat to read
                         // data line. then two more accLats to find that a
                         // line is invalid and to actually write to it.
                         dHitWritebackEvent* hwe = new (evRec) dHitWritebackEvent(this, he, 3*accLat, domain);
-                        he->setMinStartCycle(req.cycle);
-                        hwe->setMinStartCycle(respCycle);
-                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                         timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
-                        if(wbStartCycles.size()) {
-                            for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
-                                DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                                del->setMinStartCycle(req.cycle + accLat);
-                                he->addChild(del, evRec);
-                                connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
-                            }
+                        hwe->setMinStartCycle(respCycle);
+
+                        for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
+                            DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
+                            del->setMinStartCycle(req.cycle + accLat);
+                            he->addChild(del, evRec);
+                            connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
                         }
                         he->addChild(hwe, evRec);
                         tr.startEvent = tr.endEvent = he;
@@ -522,23 +520,22 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
 
                         HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
+                        he->setMinStartCycle(req.cycle);
+                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
+
                         // Timing: even though this is a hit, we need to figure out if the
                         // line has changed from before. requires extra accLat to read
                         // data line. then two more accLats to find that a
                         // line is similar and to actually update its dedup.
                         dHitWritebackEvent* hwe = new (evRec) dHitWritebackEvent(this, he, 3*accLat, domain);
-                        he->setMinStartCycle(req.cycle);
                         hwe->setMinStartCycle(respCycle);
-                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                         timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
 
-                        if(wbStartCycles.size()) {
-                            for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
-                                DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                                del->setMinStartCycle(req.cycle + accLat);
-                                he->addChild(del, evRec);
-                                connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
-                            }
+                        for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
+                            DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
+                            del->setMinStartCycle(req.cycle + accLat);
+                            he->addChild(del, evRec);
+                            connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
                         }
                         he->addChild(hwe, evRec);
                         tr.startEvent = tr.endEvent = he;
@@ -558,22 +555,21 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                             HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
+                            he->setMinStartCycle(req.cycle);
+                            timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                             // Timing: even though this is a hit, we need to figure out if the
                             // line has changed from before. requires extra accLat to read
                             // data line. then two more accLats to find that a
                             // line is colliding and to actually overwrite self.
                             dHitWritebackEvent* hwe = new (evRec) dHitWritebackEvent(this, he, 3*accLat, domain);
-                            he->setMinStartCycle(req.cycle);
                             hwe->setMinStartCycle(respCycle);
-                            timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                             timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
-                            if(wbStartCycles.size()) {
-                                for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
-                                    DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                                    del->setMinStartCycle(req.cycle + accLat);
-                                    he->addChild(del, evRec);
-                                    connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
-                                }
+
+                            for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
+                                DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
+                                del->setMinStartCycle(req.cycle + accLat);
+                                he->addChild(del, evRec);
+                                connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
                             }
                             he->addChild(hwe, evRec);
                             tr.startEvent = tr.endEvent = he;
@@ -592,9 +588,9 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                                 uint32_t victimCounter = dataArray->readCounter(dataId);
                                 dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
                             } else {
-                                debug("%s: dedup of old data line %i decreased and LL changed to %i", name.c_str(), dataId, LLHead);
                                 uint32_t victimCounter = dataArray->readCounter(dataId);
                                 int32_t LLHead = dataArray->readListHead(dataId);
+                                debug("%s: dedup of old data line %i decreased and LL changed to %i", name.c_str(), dataId, LLHead);
                                 dataArray->changeInPlace(LLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
                             }
                             // Timing: need to evict a victim dataLine, that
@@ -612,15 +608,17 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             TimingRecord writebackRecord;
                             uint64_t lastEvDoneCycle = tagEvDoneCycle;
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
+                            Address wbLineAddr;
                             while (victimListHeadId != -1) {
                                 if (victimListHeadId != tagId) {
-                                    Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                                    wbLineAddr = tagArray->readAddress(victimListHeadId);
                                     timing("%s: dedup caused eviction, evicting address %lu on cycle %lu", name.c_str(), wbLineAddr, evBeginCycle);
                                     evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
                                     timing("%s: finished eviction on cycle %lu", name.c_str(), evDoneCycle);
                                     newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                     tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
                                 } else {
+                                    wbLineAddr = 0;
                                     newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                 }
                                 if (evRec->hasRecord()) {
@@ -649,22 +647,21 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
 
                             HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
+                            he->setMinStartCycle(req.cycle);
+                            timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                             // Timing: even though this is a hit, we need to figure out if the
                             // line has changed from before. requires extra accLat to read
                             // data line. then two more accLats to find that a
                             // line is colliding and to actually overwrite another.
                             dHitWritebackEvent* hwe = new (evRec) dHitWritebackEvent(this, he, 3*accLat, domain);
-                            he->setMinStartCycle(req.cycle);
                             hwe->setMinStartCycle(lastEvDoneCycle);
-                            timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                             timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 3*accLat);
-                            if(wbStartCycles.size()) {
-                                for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
-                                    DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                                    del->setMinStartCycle(req.cycle + accLat);
-                                    he->addChild(del, evRec);
-                                    connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
-                                }
+
+                            for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
+                                DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
+                                del->setMinStartCycle(req.cycle + accLat);
+                                he->addChild(del, evRec);
+                                connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
                             }
                             he->addChild(hwe, evRec);
                             tr.startEvent = tr.endEvent = he;
@@ -687,21 +684,20 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                         tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                         HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
+                        he->setMinStartCycle(req.cycle);
+                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                         // Timing: even though this is a hit, we need to figure out if the
                         // line has changed from before. requires extra accLat to read
                         // data line. then one more accLat to overwrite self.
                         dHitWritebackEvent* hwe = new (evRec) dHitWritebackEvent(this, he, 2*accLat, domain);
-                        he->setMinStartCycle(req.cycle);
                         hwe->setMinStartCycle(respCycle);
-                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                         timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 2*accLat);
-                        if(wbStartCycles.size()) {
-                            for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
-                                DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                                del->setMinStartCycle(req.cycle + accLat);
-                                he->addChild(del, evRec);
-                                connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
-                            }
+
+                        for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
+                            DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
+                            del->setMinStartCycle(req.cycle + accLat);
+                            he->addChild(del, evRec);
+                            connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
                         }
                         he->addChild(hwe, evRec);
                         tr.startEvent = tr.endEvent = he;
@@ -720,9 +716,9 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                             uint32_t victimCounter = dataArray->readCounter(dataId);
                             dataArray->changeInPlace(newLLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
                         } else {
-                            debug("%s: dedup of old data line %i decreased and LL changed to %i", name.c_str(), dataId, LLHead);
                             uint32_t victimCounter = dataArray->readCounter(dataId);
                             int32_t LLHead = dataArray->readListHead(dataId);
+                            debug("%s: dedup of old data line %i decreased and LL changed to %i", name.c_str(), dataId, LLHead);
                             dataArray->changeInPlace(LLHead, &req, victimCounter-1, dataId, approximateVictim, NULL, false);
                         }
                         // Timing: need to evict a victim dataLine, that
@@ -740,15 +736,17 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         TimingRecord writebackRecord;
                         uint64_t lastEvDoneCycle = tagEvDoneCycle;
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
+                        Address wbLineAddr;
                         while (victimListHeadId != -1) {
                             if (victimListHeadId != tagId) {
-                                Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                                wbLineAddr = tagArray->readAddress(victimListHeadId);
                                 timing("%s: dedup caused eviction, evicting address %lu on cycle %lu", name.c_str(), wbLineAddr, evBeginCycle);
                                 evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
                                 timing("%s: finished eviction on cycle %lu", name.c_str(), evDoneCycle);
                                 newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                 tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
                             } else {
+                                wbLineAddr = 0;
                                 newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                             }
                             if (evRec->hasRecord()) {
@@ -777,21 +775,20 @@ uint64_t ApproximateDedupCache::access(MemReq& req) {
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                         tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                         HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
+                        he->setMinStartCycle(req.cycle);
+                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                         // Timing: even though this is a hit, we need to figure out if the
                         // line has changed from before. requires extra accLat to read
                         // data line. then one more accLat to overwrite self.
                         dHitWritebackEvent* hwe = new (evRec) dHitWritebackEvent(this, he, 2*accLat, domain);
-                        he->setMinStartCycle(req.cycle);
                         hwe->setMinStartCycle(lastEvDoneCycle);
-                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                         timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 2*accLat);
-                        if(wbStartCycles.size()) {
-                            for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
-                                DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                                del->setMinStartCycle(req.cycle + accLat);
-                                he->addChild(del, evRec);
-                                connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
-                            }
+
+                        for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
+                            DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
+                            del->setMinStartCycle(req.cycle + accLat);
+                            he->addChild(del, evRec);
+                            connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
                         }
                         he->addChild(hwe, evRec);
                         tr.startEvent = tr.endEvent = he;

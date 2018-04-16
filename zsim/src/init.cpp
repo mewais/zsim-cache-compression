@@ -1110,7 +1110,6 @@ void SimInit(const char* configFile, const char* outputDir, uint32_t shmid) {
     zinfo->outputDir = gm_strdup(outputDir);
     zinfo->statsBackends = new g_vector<StatsBackend*>();
     zinfo->approximateRegions = new g_vector<std::tuple<uint64_t, uint64_t, DataType, DataValue, DataValue>>();
-    zinfo->realAddresses = new g_unordered_map<uint64_t, uint64_t>();
 
     Config config(configFile);
 

@@ -42,15 +42,12 @@ void uniDoppelgangerCache::initCacheStats(AggregateStat* cacheStat) {
 
 uint64_t uniDoppelgangerCache::access(MemReq& req) {
     if (tag_all) tag_all->inc();
-    // // // info("%lu: REQ %s to address %lu.", req.cycle, AccessTypeName(req.type), req.lineAddr);
     DataLine data = gm_calloc<uint8_t>(zinfo->lineSize);
     DataType type = ZSIM_FLOAT;
     DataValue min, max;
     bool approximate = false;
     uint64_t Evictions = 0;
     uint64_t readAddress = req.lineAddr;
-    if (zinfo->realAddresses->find(req.lineAddr) != zinfo->realAddresses->end())
-        readAddress = (*zinfo->realAddresses)[req.lineAddr];
     for(uint32_t i = 0; i < zinfo->approximateRegions->size(); i++) {
         if ((readAddress << lineBits) >= std::get<0>((*zinfo->approximateRegions)[i]) && (readAddress << lineBits) <= std::get<1>((*zinfo->approximateRegions)[i])
         && (readAddress << lineBits)+zinfo->lineSize-1 >= std::get<0>((*zinfo->approximateRegions)[i]) && (readAddress << lineBits)+zinfo->lineSize-1 <= std::get<1>((*zinfo->approximateRegions)[i])) {
@@ -63,6 +60,9 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
     }
     if (approximate)
         PIN_SafeCopy(data, (void*)(readAddress << lineBits), zinfo->lineSize);
+
+    debug("%s: received %s %s req of data type %s on address %lu on cycle %lu", name.c_str(), (approximate? "approximate":""), AccessTypeName(req.type), DataTypeName(type), req.lineAddr, req.cycle);
+    timing("%s: received %s req on address %lu on cycle %lu", name.c_str(), AccessTypeName(req.type), req.lineAddr, req.cycle);
 
     EventRecorder* evRec = zinfo->eventRecorders[req.srcId];
     assert_msg(evRec, "uniDoppelgangerCache is not connected to TimingCore");
@@ -79,7 +79,6 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
 
             if (upLat) {
                 DelayEvent* dUp = new (evRec) DelayEvent(upLat);
-                // // // info("uCREATE: %p at %u", dUp, __LINE__);
                 dUp->setMinStartCycle(startCycle);
                 startEv->addChild(dUp, evRec)->addChild(r->startEvent, evRec);
             } else {
@@ -88,7 +87,6 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
 
             if (downLat) {
                 DelayEvent* dDown = new (evRec) DelayEvent(downLat);
-                // // // info("uCREATE: %p at %u", dDown, __LINE__);
                 dDown->setMinStartCycle(r->respCycle);
                 r->endEvent->addChild(dDown, evRec)->addChild(endEv, evRec);
             } else {
@@ -99,7 +97,6 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                 startEv->addChild(endEv, evRec);
             } else {
                 DelayEvent* dEv = new (evRec) DelayEvent(endCycle - startCycle);
-                // // // info("uCREATE: %p at %u", dEv, __LINE__);
                 dEv->setMinStartCycle(startCycle);
                 startEv->addChild(dEv, evRec)->addChild(endEv, evRec);
             }
@@ -118,83 +115,75 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
 
     bool skipAccess = cc->startAccess(req); //may need to skip access due to races (NOTE: may change req.type!)
     if (likely(!skipAccess)) {
-        // info("%lu: REQ %s to address %lu", req.cycle, AccessTypeName(req.type), req.lineAddr << lineBits);
-        // info("Req data type: %s, data: %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", DataTypeName(type), ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3], ((float*)data)[4], ((float*)data)[5], ((float*)data)[6], ((float*)data)[7], ((float*)data)[8], ((float*)data)[9], ((float*)data)[10], ((float*)data)[11], ((float*)data)[12], ((float*)data)[13], ((float*)data)[14], ((float*)data)[15]);
         bool updateReplacement = (req.type == GETS) || (req.type == GETX);
         int32_t tagId = tagArray->lookup(req.lineAddr, &req, updateReplacement);
-
+        respCycle += accLat;
+        evictCycle += accLat;
+        timing("%s: tag accessed on cycle %lu", name.c_str(), respCycle);
         MissStartEvent* mse;
         MissResponseEvent* mre;
         MissWritebackEvent* mwe;
         if (tagId == -1) {
             if (tag_misses) tag_misses->inc();
             if (approximate) {
-                 // info("\tApproximate Tag Miss");
-                // Exact line, free a data line and a tag for it.
-                respCycle += accLat;
-                evictCycle += accLat;
+                debug("%s: approximate tag miss.", name.c_str());
                 assert(cc->shouldAllocate(req));
-
                 // Get the eviction candidate
                 Address wbLineAddr;
                 int32_t victimTagId = tagArray->preinsert(req.lineAddr, &req, &wbLineAddr); //find the lineId to replace
-                trace(Cache, "[%s] Evicting 0x%lx", name.c_str(), wbLineAddr);
-
                 // Need to evict the tag.
-                // info("\t\tEvicting tagId: %i", victimTagId);
+                // Timing: to evict, need to read the data array too.
+                evictCycle += accLat;
+                timing("%s: tag access missed, evicting address %lu on cycle %lu", name.c_str(), wbLineAddr, evictCycle);
                 tagEvDoneCycle = cc->processEviction(req, wbLineAddr, victimTagId, evictCycle);
-                // // // info("\t\t\tEviction finished at %lu", tagEvDoneCycle);
+                timing("%s: finished eviction on cycle %lu", name.c_str(), tagEvDoneCycle);
                 int32_t newLLHead;
                 bool approximateVictim;
                 bool evictDataLine = tagArray->evictAssociatedData(victimTagId, &newLLHead, &approximateVictim);
                 int32_t victimDataId = tagArray->readMapId(victimTagId);
                 if (evictDataLine) {
-                    // info("\t\tAlong with dataId: %i", victimDataId);
+                    debug("%s: tag miss caused eviction of data line %i", name.c_str(), victimDataId);
                     // Clear (Evict, Tags already evicted) data line
                     dataArray->postinsert(-1, &req, victimDataId, -1, false, false);
                 } else if (newLLHead != -1) {
+                    debug("%s: tag miss caused dedup of data line %i to decrease", name.c_str(), victimDataId);
                     // Change Tag
                     uint32_t victimMap = dataArray->readMap(victimDataId);
                     dataArray->changeInPlace(victimMap, &req, victimDataId, newLLHead, approximateVictim, false);
                 }
                 if (evRec->hasRecord()) {
+                    debug("%s: tag miss caused eviction of address %lu", name.c_str(), wbLineAddr);
                     Evictions++;
                     tagWritebackRecord.clear();
                     tagWritebackRecord = evRec->popRecord();
                 }
-                uint32_t map = dataArray->calculateMap(data, type, min, max);
-                // // // info("\tMiss Req data type: %s, data: %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", DataTypeName(type), ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3], ((float*)data)[4], ((float*)data)[5], ((float*)data)[6], ((float*)data)[7], ((float*)data)[8], ((float*)data)[9], ((float*)data)[10], ((float*)data)[11], ((float*)data)[12], ((float*)data)[13], ((float*)data)[14], ((float*)data)[15]);
-                // info("\tMiss data map: %u", map);
-                int32_t mapId = dataArray->lookup(map, &req, updateReplacement);
-
                 // Need to get the line we want
                 uint64_t getDoneCycle = respCycle;
+                timing("%s: doing processAccess on cycle %lu", name.c_str(), respCycle);
                 respCycle = cc->processAccess(req, victimTagId, respCycle, &getDoneCycle);
+                timing("%s: finished processAccess on cycle %lu", name.c_str(), respCycle);
                 tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                 if (evRec->hasRecord()) accessRecord = evRec->popRecord();
 
+                uint32_t map = dataArray->calculateMap(data, type, min, max);
+                debug("%s: data hashed to %u", name.c_str(), map);
+                int32_t mapId = dataArray->lookup(map, &req, updateReplacement);
+
                 if (mapId != -1) {
-                    // info("\t\tSimilar map at: %i", mapId);
-                    // Found similar mtag, insert tag to the LL.
+                    debug("%s: Found similar hash on line %i", name.c_str(), mapId);
                     int32_t oldListHead = dataArray->readListHead(mapId);
                     tagArray->postinsert(req.lineAddr, &req, victimTagId, mapId, oldListHead, true, updateReplacement);
                     dataArray->postinsert(map, &req, mapId, victimTagId, true, updateReplacement);
-
                     assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
-
                     mse = new (evRec) MissStartEvent(this, accLat, domain);
-                    // // // info("uCREATE: %p at %u", mse, __LINE__);
                     mre = new (evRec) MissResponseEvent(this, mse, domain);
-                    // // // info("uCREATE: %p at %u", mre, __LINE__);
                     mwe = new (evRec) MissWritebackEvent(this, mse, accLat, domain);
-                    // // // info("uCREATE: %p at %u", mwe, __LINE__);
-
                     mse->setMinStartCycle(req.cycle);
-                    // // // info("\t\t\tMiss Start Event: %lu, %u", req.cycle, accLat);
                     mre->setMinStartCycle(respCycle);
-                    // // // info("\t\t\tMiss Response Event: %lu", respCycle);
                     mwe->setMinStartCycle(MAX(respCycle, tagEvDoneCycle));
-                    // // // info("\t\t\tMiss writeback event: %lu, %u", MAX(respCycle, tagEvDoneCycle), accLat);
+                    timing("%s: missStartEvent Min Start: %lu, duration: %u", name.c_str(), req.cycle, accLat);
+                    timing("%s: missResponseEvent Min Start: %lu", name.c_str(), respCycle);
+                    timing("%s: missWritebackEvent Min Start: %lu, duration: %u", name.c_str(), MAX(respCycle, tagEvDoneCycle), accLat);
 
                     connect(accessRecord.isValid()? &accessRecord : nullptr, mse, mre, req.cycle + accLat, respCycle);
                     mre->addChild(mwe, evRec);
@@ -202,30 +191,32 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                         connect(tagWritebackRecord.isValid()? &tagWritebackRecord : nullptr, mse, mwe, req.cycle + accLat, tagEvDoneCycle);
                     }
                 } else {
-                    // info("\t\tNo similar map");
-                    // allocate new data/mtag and evict another if necessary,
-                    // evict the tags associated with it too.
-                    evictCycle = respCycle + accLat;
+                    debug("%s: Found no matching hash.", name.c_str());
+                    // Timing: because no similar line was found, we need to read
+                    // another victim data line, one more accLat for the data
+                    // and another for the tag, all after recieving the response.
+                    evictCycle = respCycle + 2*accLat;
+                    timing("%s: Read victim line for eviction on cycle %lu", name.c_str(), evictCycle);
                     int32_t victimListHeadId, newVictimListHeadId;
                     int32_t victimDataId = dataArray->preinsert(map, &req, &victimListHeadId);
-                    // info("\t\tEvicting Data line %i", victimDataId);
+                    debug("%s: Picked victim data line %i", name.c_str(), victimDataId);
                     uint64_t evBeginCycle = evictCycle;
                     uint64_t evDoneCycle = evictCycle;
                     TimingRecord writebackRecord;
                     uint64_t lastEvDoneCycle = tagEvDoneCycle;
-
                     while (victimListHeadId != -1) {
                         if (victimListHeadId != victimTagId) {
                             Address wbLineAddr = tagArray->readAddress(victimListHeadId);
-                            // info("\t\talong with tagId: %i", victimListHeadId);
+                            timing("%s: dedup caused eviction, evicting address %lu on cycle %lu", name.c_str(), wbLineAddr, evBeginCycle);
                             evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
-                            // // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                            timing("%s: finished eviction on cycle %lu", name.c_str(), evDoneCycle);
                             newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                             tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
                         } else {
                             newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                         }
                         if (evRec->hasRecord()) {
+                            debug("%s: dedup caused eviction from tagId %i for address %lu", name.c_str(), victimListHeadId, wbLineAddr);
                             Evictions++;
                             writebackRecord.clear();
                             writebackRecord = evRec->popRecord();
@@ -242,24 +233,19 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                     assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
 
                     mse = new (evRec) MissStartEvent(this, accLat, domain);
-                    // // // info("uCREATE: %p at %u", mse, __LINE__);
                     mre = new (evRec) MissResponseEvent(this, mse, domain);
-                    // // // info("uCREATE: %p at %u", mre, __LINE__);
                     mwe = new (evRec) MissWritebackEvent(this, mse, accLat, domain);
-                    // // // info("uCREATE: %p at %u", mwe, __LINE__);
-
                     mse->setMinStartCycle(req.cycle);
-                    // // // info("\t\t\tMiss Start Event: %lu, %u", req.cycle, accLat);
                     mre->setMinStartCycle(respCycle);
-                    // // // info("\t\t\tMiss Response Event: %lu", respCycle);
                     mwe->setMinStartCycle(MAX(lastEvDoneCycle, tagEvDoneCycle));
-                    // // // info("\t\t\tMiss writeback event: %lu, %u", MAX(lastEvDoneCycle, tagEvDoneCycle), accLat);
+                    timing("%s: missStartEvent Min Start: %lu, duration: %u", name.c_str(), req.cycle, accLat);
+                    timing("%s: missResponseEvent Min Start: %lu", name.c_str(), respCycle);
+                    timing("%s: missWritebackEvent Min Start: %lu, duration: %u", name.c_str(), MAX(lastEvDoneCycle, tagEvDoneCycle), accLat);
 
                     connect(accessRecord.isValid()? &accessRecord : nullptr, mse, mre, req.cycle + accLat, respCycle);
                     if(wbStartCycles.size()) {
                         for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                             DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - respCycle);
-                            // // // info("uCREATE: %p at %u", del, __LINE__);
                             del->setMinStartCycle(respCycle);
                             mre->addChild(del, evRec);
                             connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, mwe, wbStartCycles[i], wbEndCycles[i]);
@@ -271,10 +257,9 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                     }
                 }
             } else {
+                debug("%s: exact tag miss.", name.c_str());
+
                 // Miss, no tags found.
-                // info("\tExact Tag Miss");
-                respCycle += accLat;
-                evictCycle += accLat;
                 assert(cc->shouldAllocate(req));
 
                 // Get the eviction candidate
@@ -283,96 +268,96 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                 trace(Cache, "[%s] Evicting 0x%lx", name.c_str(), wbLineAddr);
 
                 // Need to evict the tag.
-                // info("\t\tEvicting tagId: %i", victimTagId);
+                timing("%s: tag access missed, evicting address %lu on cycle %lu", name.c_str(), wbLineAddr, evictCycle);
                 tagEvDoneCycle = cc->processEviction(req, wbLineAddr, victimTagId, evictCycle);
-                // // // info("\t\t\tEviction finished at %lu", tagEvDoneCycle);
+                timing("%s: finished eviction on cycle %lu", name.c_str(), tagEvDoneCycle);
                 int32_t newLLHead;
                 bool approximateVictim;
                 bool evictDataLine = tagArray->evictAssociatedData(victimTagId, &newLLHead, &approximateVictim);
                 int32_t victimDataId = tagArray->readMapId(victimTagId);
-                bool Free = false;
                 if (evictDataLine) {
-                    // info("\t\tAlong with dataId: %i", victimDataId);
+                    debug("%s: tag miss caused eviction of data line %i", name.c_str(), victimDataId);
                     // Clear (Evict, Tags already evicted) data line
                     dataArray->postinsert(-1, &req, victimDataId, -1, false, false);
-                    Free = true;
                 } else if (newLLHead != -1) {
+                    debug("%s: tag miss caused dedup of data line %i to decrease", name.c_str(), victimDataId);
                     // Change Tag
                     uint32_t victimMap = dataArray->readMap(victimDataId);
                     dataArray->changeInPlace(victimMap, &req, victimDataId, newLLHead, approximateVictim, false);
                 }
                 if (evRec->hasRecord()) {
+                    debug("%s: tag miss caused eviction of address %lu", name.c_str(), wbLineAddr);
                     Evictions++;
                     tagWritebackRecord.clear();
                     tagWritebackRecord = evRec->popRecord();
                 }
                 // Need to get the line we want
                 uint64_t getDoneCycle = respCycle;
+                timing("%s: doing processAccess on cycle %lu", name.c_str(), respCycle);
                 respCycle = cc->processAccess(req, victimTagId, respCycle, &getDoneCycle);
+                timing("%s: finished processAccess on cycle %lu", name.c_str(), respCycle);
                 tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                 if (evRec->hasRecord()) accessRecord = evRec->popRecord();
 
                 // Need to free a data line
                 uint64_t evBeginCycle = 0;
                 uint64_t lastEvDoneCycle = evictCycle;
-                if (!Free) {
-                    // srand (time(NULL));
-                    int32_t victimListHeadId, newVictimListHeadId;
-                    uint32_t map = rand() % (uint32_t)std::pow(2, zinfo->mapSize-1);
-                    victimDataId = dataArray->preinsert(map, &req, &victimListHeadId);
-                    // info("\t\tEvicting Data line %i", victimDataId);
-                    evictCycle += accLat;
-                    evBeginCycle = evictCycle;
-                    uint64_t evDoneCycle = evictCycle;
-                    TimingRecord writebackRecord;
+                int32_t victimListHeadId, newVictimListHeadId;
+                uint32_t map = rand() % (uint32_t)std::pow(2, zinfo->mapSize-1);
+                victimDataId = dataArray->preinsert(map, &req, &victimListHeadId);
+                // Timing: because no similar line was found, we need to read
+                // another victim data line, one more accLat for the data
+                // and another for the tag, all after recieving the response.
+                evictCycle = respCycle + 2*accLat;
+                timing("%s: Read victim line for eviction on cycle %lu", name.c_str(), evictCycle);
+                evBeginCycle = evictCycle;
+                uint64_t evDoneCycle = evictCycle;
+                TimingRecord writebackRecord;
 
-                    while (victimListHeadId != -1) {
-                        if (victimListHeadId != victimTagId) {
-                            Address wbLineAddr = tagArray->readAddress(victimListHeadId);
-                            // info("\t\tAlong with tagId: %i", victimListHeadId);
-                            evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
-                            // // // info("\t\t\tEviction finished at %lu", evDoneCycle);
-                            newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
-                            tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
-                        } else {
-                            newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
-                        }
-                        if (evRec->hasRecord()) {
-                            Evictions++;
-                            writebackRecord.clear();
-                            writebackRecord = evRec->popRecord();
-                            writebackRecords.push_back(writebackRecord);
-                            wbStartCycles.push_back(evBeginCycle);
-                            wbEndCycles.push_back(evDoneCycle);
-                            lastEvDoneCycle = evDoneCycle;
-                            evBeginCycle += accLat;
-                        }
-                        victimListHeadId = newVictimListHeadId;
+                while (victimListHeadId != -1) {
+                    if (victimListHeadId != victimTagId) {
+                        Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                        timing("%s: dedup caused eviction, evicting address %lu on cycle %lu", name.c_str(), wbLineAddr, evBeginCycle);
+                        evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
+                        timing("%s: finished eviction on cycle %lu", name.c_str(), evDoneCycle);
+                        newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
+                        tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
+                    } else {
+                        newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                     }
+                    if (evRec->hasRecord()) {
+                        debug("%s: dedup caused eviction from tagId %i for address %lu", name.c_str(), victimListHeadId, wbLineAddr);
+                        Evictions++;
+                        writebackRecord.clear();
+                        writebackRecord = evRec->popRecord();
+                        writebackRecords.push_back(writebackRecord);
+                        wbStartCycles.push_back(evBeginCycle);
+                        wbEndCycles.push_back(evDoneCycle);
+                        lastEvDoneCycle = evDoneCycle;
+                        evBeginCycle += accLat;
+                    }
+                    victimListHeadId = newVictimListHeadId;
                 }
                 tagArray->postinsert(req.lineAddr, &req, victimTagId, victimDataId, -1, false, updateReplacement);
                 dataArray->postinsert(-1, &req, victimDataId, victimTagId, false, updateReplacement);
 
                 assert_msg(getDoneCycle == respCycle, "gdc %ld rc %ld", getDoneCycle, respCycle);
                 mse = new (evRec) MissStartEvent(this, accLat, domain);
-                // // // info("uCREATE: %p at %u", mse, __LINE__);
                 mre = new (evRec) MissResponseEvent(this, mse, domain);
-                // // // info("uCREATE: %p at %u", mre, __LINE__);
                 mwe = new (evRec) MissWritebackEvent(this, mse, accLat, domain);
-                // // // info("uCREATE: %p at %u", mwe, __LINE__);
 
                 mse->setMinStartCycle(req.cycle);
-                // // // info("\t\t\tMiss Start Event: %lu, %u", req.cycle, accLat);
                 mre->setMinStartCycle(respCycle);
-                // // // info("\t\t\tMiss Response Event: %lu", respCycle);
                 mwe->setMinStartCycle(MAX(lastEvDoneCycle, tagEvDoneCycle));
-                // // // info("\t\t\tMiss writeback event: %lu, %u", MAX(lastEvDoneCycle, tagEvDoneCycle), accLat);
+                timing("%s: missStartEvent Min Start: %lu, duration: %u", name.c_str(), req.cycle, accLat);
+                timing("%s: missResponseEvent Min Start: %lu", name.c_str(), respCycle);
+                timing("%s: missWritebackEvent Min Start: %lu, duration: %u", name.c_str(), MAX(lastEvDoneCycle, tagEvDoneCycle), accLat);
+
 
                 connect(accessRecord.isValid()? &accessRecord : nullptr, mse, mre, req.cycle + accLat, respCycle);
                 if(wbStartCycles.size()) {
                     for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                         DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                        // // // info("uCREATE: %p at %u", del, __LINE__);
                         del->setMinStartCycle(req.cycle + accLat);
                         mse->addChild(del, evRec);
                         connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, mwe, wbStartCycles[i], wbEndCycles[i]);
@@ -388,33 +373,32 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
         } else {
             if (tag_hits) tag_hits->inc();
             if (approximate && req.type == PUTX) {
-                // info("\tApproximate Write Tag Hit");
+                debug("%s: Approximate Write Tag Hit", name.c_str());
                 // If this is a write
                 uint32_t map = dataArray->calculateMap(data, type, min, max);
-                // info("\tHit data map: %u", map);
-                respCycle += accLat;
-                // // // info("\tHit Req data type: %s, data: %f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", DataTypeName(type), ((float*)data)[0], ((float*)data)[1], ((float*)data)[2], ((float*)data)[3], ((float*)data)[4], ((float*)data)[5], ((float*)data)[6], ((float*)data)[7], ((float*)data)[8], ((float*)data)[9], ((float*)data)[10], ((float*)data)[11], ((float*)data)[12], ((float*)data)[13], ((float*)data)[14], ((float*)data)[15]);
-                // // info("\tHit PUTX Req map: %u, tagId = %i", map, tagId);
                 uint32_t previousMap = dataArray->readMap(tagArray->readMapId(tagId));
+                debug("%s: hashed data to %u", name.c_str(), map);
 
                 if (map == previousMap) {
-                    // info("\tMap not different from before, nothing to do.");
-                    // and its map is the same as before. Do nothing.
+                    debug("%s: hash is the same as before.", name.c_str());
+                    respCycle += accLat;
                     uint64_t getDoneCycle = respCycle;
+                    timing("%s: doing processAccess on cycle %lu", name.c_str(), respCycle);
                     respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
+                    timing("%s: finished processAccess on cycle %lu", name.c_str(), respCycle);
                     if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                     tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                     dataArray->lookup(map, &req, updateReplacement);
                     HitEvent* ev = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
-                    // // // info("uCREATE: %p at %u", ev, __LINE__);
-                    // // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
                     ev->setMinStartCycle(req.cycle);
+                    timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                     tr.startEvent = tr.endEvent = ev;
                 } else {
+                    debug("%s: hash is different from before.", name.c_str());
                     // and its map is not the same as before.
                     int32_t mapId = dataArray->lookup(map, &req, updateReplacement);
                     if (mapId != -1) {
-                        // info("\tSimilar map at: %i", mapId);
+                        debug("%s: Found matching hash at %i", name.c_str(), mapId);
                         // but is similar to something else that exists.
                         // we only need to add the tag to the existing linked
                         // list.
@@ -423,11 +407,12 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                         bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead, &approximateVictim);
                         int32_t victimDataId = tagArray->readMapId(tagId);
                         if (evictDataLine) {
-                            // info("\t\tEvicting dataId %i previously associated with tagId %i", victimDataId, tagId);
+                            debug("%s: old data line %i evicted", name.c_str(), mapId);
                             // Clear (Evict, Tags already evicted) data line
                             dataArray->postinsert(-1, &req, victimDataId, -1, false, false);
                         } else if (newLLHead != -1) {
                             // Change Tag
+                            debug("%s: dedup of old data line %i decreased", name.c_str(), mapId);
                             uint32_t victimMap = dataArray->readMap(victimDataId);
                             dataArray->changeInPlace(victimMap, &req, victimDataId, newLLHead, approximateVictim, false);
                         }
@@ -435,113 +420,129 @@ uint64_t uniDoppelgangerCache::access(MemReq& req) {
                         tagArray->changeInPlace(req.lineAddr, &req, tagId, mapId, oldListHead, true, false);
                         dataArray->postinsert(map, &req, mapId, tagId, true, false);
                         respCycle += accLat;
-
                         uint64_t getDoneCycle = respCycle;
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                         tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
-                        HitEvent* ev = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
-                        // // // info("uCREATE: %p at %u", ev, __LINE__);
-                        // // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
-                        ev->setMinStartCycle(req.cycle);
-                        tr.startEvent = tr.endEvent = ev;
+                        HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
+                        he->setMinStartCycle(req.cycle);
+                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
+                        // Timing: even though this is a hit, we need to figure out if the
+                        // line has changed from before. requires two more accLats to find that a
+                        // line is similar and to actually update its dedup.
+                        uHitWritebackEvent* hwe = new (evRec) uHitWritebackEvent(this, he, 2*accLat, domain);
+                        hwe->setMinStartCycle(respCycle);
+                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 2*accLat);
+
+                        for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
+                            DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
+                            del->setMinStartCycle(req.cycle + accLat);
+                            he->addChild(del, evRec);
+                            connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
+                        }
+                        he->addChild(hwe, evRec);
+                        tr.startEvent = tr.endEvent = he;
                     } else {
-                        // info("\tNo similar map");
+                        debug("%s: Found no matching hash", name.c_str());
                         // and is also not similar to anything we have, we
                         // need to allocate new data, and evict another if we
                         // have to.
+                        int32_t newLLHead;
+                        bool approximateVictim;
+                        bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead, &approximateVictim);
+                        int32_t victimDataId2 = tagArray->readMapId(tagId);
+                        if (evictDataLine) {
+                            debug("%s: old data line %i evicted", name.c_str(), victimDataId2);
+                            // Clear (Evict, Tags already evicted) data line
+                            dataArray->postinsert(-1, &req, victimDataId2, -1, false, false);
+                        } else if (newLLHead != -1) {
+                            debug("%s: dedup of old data line %i decreased", name.c_str(), victimDataId2);
+                            // Change Tag
+                            uint32_t victimMap = dataArray->readMap(victimDataId2);
+                            dataArray->changeInPlace(victimMap, &req, victimDataId2, newLLHead, approximateVictim, false);
+                        }
+
+                        // Timing: need to evict a victim dataLine, that
+                        // means we need to read it's data, then tag
+                        // first.
+                        evictCycle = respCycle + 2*accLat;
+                        timing("%s: Read victim line for eviction on cycle %lu", name.c_str(), evictCycle);
+
                         int32_t victimListHeadId, newVictimListHeadId;
                         int32_t victimDataId = dataArray->preinsert(map, &req, &victimListHeadId);
-                        // info("\t\tEvicting Data line %i", victimDataId);
-                        respCycle += accLat;
+                        debug("%s: Picked victim data line %i", name.c_str(), victimDataId);
                         uint64_t wbStartCycle = respCycle;
                         uint64_t evDoneCycle = respCycle;
                         TimingRecord writebackRecord;
-
-                        uint64_t lastEvDoneCycle = respCycle;
-
+                        Address wbLineAddr;
                         while (victimListHeadId != -1) {
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             if (victimListHeadId != tagId) {
-                                Address wbLineAddr = tagArray->readAddress(victimListHeadId);
-                                // info("\t\tAlong with tagId %i", victimListHeadId);
+                                wbLineAddr = tagArray->readAddress(victimListHeadId);
+                                timing("%s: dedup caused eviction, evicting address %lu on cycle %lu", name.c_str(), wbLineAddr, wbStartCycle);
                                 evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, wbStartCycle);
-                                // // // info("\t\t\tEviction finished at %lu", evDoneCycle);
+                                timing("%s: finished eviction on cycle %lu", name.c_str(), wbStartCycle);
                                 newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                                 tagArray->postinsert(0, &req, victimListHeadId, -1, -1, false, false);
                             } else {
+                                wbLineAddr = 0;
                                 newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
                             }
                             if (evRec->hasRecord()) {
+                                debug("%s: dedup caused eviction from tagId %i for address %lu", name.c_str(), victimListHeadId, wbLineAddr);
                                 Evictions++;
                                 writebackRecord.clear();
                                 writebackRecord = evRec->popRecord();
                                 writebackRecords.push_back(writebackRecord);
                                 wbStartCycles.push_back(wbStartCycle);
                                 wbStartCycle += accLat;
-                                respCycle += accLat;
                                 wbEndCycles.push_back(evDoneCycle);
-                                lastEvDoneCycle = evDoneCycle;
                             }
                             victimListHeadId = newVictimListHeadId;
                         }
 
-                        int32_t newLLHead;
-                        bool approximateVictim;
-                        bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead, &approximateVictim);
-                        int32_t victimDataId2 = tagArray->readMapId(tagId);
-                        if (evictDataLine) {
-                            // info("\t\tClearing dataId %i previously associated with tagId %i", victimDataId2, tagId);
-                            // Clear (Evict, Tags already evicted) data line
-                            dataArray->postinsert(-1, &req, victimDataId2, -1, false, false);
-                        } else if (newLLHead != -1) {
-                            // Change Tag
-                            uint32_t victimMap = dataArray->readMap(victimDataId2);
-                            dataArray->changeInPlace(victimMap, &req, victimDataId2, newLLHead, approximateVictim, false);
-                        }
                         tagArray->changeInPlace(req.lineAddr, &req, tagId, victimDataId, -1, true, false);
                         dataArray->postinsert(map, &req, victimDataId, tagId, true, false);
-                        respCycle += accLat;
-
                         uint64_t getDoneCycle = respCycle;
+                        timing("%s: doing processAccess on cycle %lu", name.c_str(), respCycle);
                         respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
+                        timing("%s: finished processAccess on cycle %lu", name.c_str(), respCycle);
                         if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                         tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
 
                         HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
-                        // // // info("uCREATE: %p at %u", he, __LINE__);
-                        uHitWritebackEvent* hwe = new (evRec) uHitWritebackEvent(this, he, respCycle - req.cycle, domain);
-                        // // // info("uCREATE: %p at %u", hwe, __LINE__);
-
                         he->setMinStartCycle(req.cycle);
-                        hwe->setMinStartCycle(lastEvDoneCycle);
-                        // // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
-                        // // // info("\t\t\tHit writeback Event: %lu, %lu", lastEvDoneCycle, respCycle - req.cycle);
+                        timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
+                        // Timing: even though this is a hit, we need to figure out if the
+                        // line has changed from before. requires two more accLats to find that a
+                        // line is similar and to actually update its dedup.
+                        uHitWritebackEvent* hwe = new (evRec) uHitWritebackEvent(this, he, 2*accLat, domain);
+                        hwe->setMinStartCycle(respCycle);
+                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), respCycle, 2*accLat);
 
-                        if(wbStartCycles.size()) {
-                            for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
-                                DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                                // // // info("uCREATE: %p at %u", del, __LINE__);
-                                del->setMinStartCycle(req.cycle + accLat);
-                                he->addChild(del, evRec);
-                                connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
-                            }
+                        for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
+                            DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
+                            del->setMinStartCycle(req.cycle + accLat);
+                            he->addChild(del, evRec);
+                            connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
                         }
                         he->addChild(hwe, evRec);
                         tr.startEvent = tr.endEvent = he;
                     }
                 }
             } else {
-                // info("\tHit Req");
+                debug("%s: read hit, or exact write hit.", name.c_str());
                 dataArray->lookup(tagArray->readMapId(tagId), &req, updateReplacement);
                 respCycle += accLat;
+                timing("%s: reading data on cycle %lu", name.c_str(), respCycle);
                 uint64_t getDoneCycle = respCycle;
+                timing("%s: doing processAccess on cycle %lu", name.c_str(), respCycle);
                 respCycle = cc->processAccess(req, tagId, respCycle, &getDoneCycle);
+                timing("%s: finished processAccess on cycle %lu", name.c_str(), respCycle);
                 if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                 tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
                 HitEvent* ev = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
-                // // // info("uCREATE: %p at %u", ev, __LINE__);
-                // // // info("\t\t\tHit Event: %lu, %lu", req.cycle, respCycle - req.cycle);
+                timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
                 ev->setMinStartCycle(req.cycle);
                 tr.startEvent = tr.endEvent = ev;
             }

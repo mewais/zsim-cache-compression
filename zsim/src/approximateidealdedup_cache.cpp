@@ -57,8 +57,6 @@ uint64_t ApproximateIdealDedupCache::access(MemReq& req) {
     bool approximate = false;
     uint64_t Evictions = 0;
     uint64_t readAddress = req.lineAddr;
-    if (zinfo->realAddresses->find(req.lineAddr) != zinfo->realAddresses->end())
-        readAddress = (*zinfo->realAddresses)[req.lineAddr];
     for(uint32_t i = 0; i < zinfo->approximateRegions->size(); i++) {
         if ((readAddress << lineBits) >= std::get<0>((*zinfo->approximateRegions)[i]) && (readAddress << lineBits) <= std::get<1>((*zinfo->approximateRegions)[i])
         && (readAddress << lineBits)+zinfo->lineSize-1 >= std::get<0>((*zinfo->approximateRegions)[i]) && (readAddress << lineBits)+zinfo->lineSize-1 <= std::get<1>((*zinfo->approximateRegions)[i])) {

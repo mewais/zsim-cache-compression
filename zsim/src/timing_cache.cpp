@@ -110,7 +110,7 @@ uint64_t TimingCache::access(MemReq& req) {
                 debug("%s: tag miss caused eviction of address %lu", name.c_str(), wbLineAddr);
             }
         } else {
-            // Timing: This is the delay for reading tag array
+            // Timing: Data latency
             respCycle += accLat;
             debug("%s: tag hit on line %i", name.c_str(), lineId);
             timing("%s: tag access hit, reading data on cycle %lu", name.c_str(), respCycle);

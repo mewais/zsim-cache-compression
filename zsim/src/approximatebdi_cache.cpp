@@ -48,8 +48,6 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
     bool approximate = false;
     uint64_t Evictions = 0;
     uint64_t readAddress = req.lineAddr;
-    if (zinfo->realAddresses->find(req.lineAddr) != zinfo->realAddresses->end())
-        readAddress = (*zinfo->realAddresses)[req.lineAddr];
     for(uint32_t i = 0; i < zinfo->approximateRegions->size(); i++) {
         if ((readAddress << lineBits) >= std::get<0>((*zinfo->approximateRegions)[i]) && (readAddress << lineBits) <= std::get<1>((*zinfo->approximateRegions)[i])
         && (readAddress << lineBits)+zinfo->lineSize-1 >= std::get<0>((*zinfo->approximateRegions)[i]) && (readAddress << lineBits)+zinfo->lineSize-1 <= std::get<1>((*zinfo->approximateRegions)[i])) {
@@ -223,7 +221,7 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
             tr.endEvent = mre;
         } else {
             if(tag_hits) tag_hits->inc();
-            debug("%s: tag hit on line %i", name.c_str(), lineId);
+            debug("%s: tag hit on line %i", name.c_str(), tagId);
             if (req.type == PUTX) {
                 // Now compress (and approximate) the new line
                 if (approximate)
@@ -307,24 +305,22 @@ uint64_t ApproximateBDICache::access(MemReq& req) {
                     tr = {req.lineAddr << lineBits, req.cycle, respCycle, req.type, nullptr, nullptr};
 
                     HitEvent* he = new (evRec) HitEvent(this, respCycle - req.cycle, domain);
-                    // Timing: Writing the value requires reading for
-                    // evictions first, then actually writing the new data.
-                    aHitWritebackEvent* hwe = new (evRec) aHitWritebackEvent(this, he, accLat, domain);
-
                     he->setMinStartCycle(req.cycle);
-                    hwe->setMinStartCycle(lastEvDoneCycle);
                     timing("%s: hitEvent Min Start: %lu, duration: %lu", name.c_str(), req.cycle, respCycle - req.cycle);
-                    timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), lastEvDoneCycle, accLat);
-
                     if(wbStartCycles.size()) {
+                        // Timing: Writing the value requires reading for
+                        // evictions first, then actually writing the new data.
+                        aHitWritebackEvent* hwe = new (evRec) aHitWritebackEvent(this, he, accLat, domain);
+                        hwe->setMinStartCycle(lastEvDoneCycle);
+                        timing("%s: hitWritebackEvent Min Start: %lu, duration: %u", name.c_str(), lastEvDoneCycle, accLat);
                         for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                             DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + 2*accLat));
                             del->setMinStartCycle(req.cycle + 2*accLat);
                             he->addChild(del, evRec);
                             connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
                         }
+                        he->addChild(hwe, evRec);
                     }
-                    he->addChild(hwe, evRec);
                     tr.startEvent = tr.endEvent = he;
                 }
             } else {

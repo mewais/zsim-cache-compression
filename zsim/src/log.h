@@ -149,6 +149,7 @@ class PrintExpr {
     log_unlock(); \
 }
 
+// #define __DEBUG__
 #ifdef __DEBUG__
 #define debug(args...) \
 { \
@@ -163,7 +164,7 @@ class PrintExpr {
 #define debug(args...)
 #endif
 
-#define __TIMING__
+// #define __TIMING__
 #ifdef __TIMING__
 #define timing(args...) \
 { \
