@@ -947,7 +947,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
 
                             for(uint32_t i = 0; i < wbStartCycles.size(); i++) {
                                 DelayEvent* del = new (evRec) DelayEvent(wbStartCycles[i] - (req.cycle + accLat));
-                                // // // info("uCREATE: %p at %u", del, __LINE__);
                                 del->setMinStartCycle(req.cycle + accLat);
                                 he->addChild(del, evRec);
                                 connect(writebackRecords[i].isValid()? &writebackRecords[i] : nullptr, del, hwe, wbStartCycles[i], wbEndCycles[i]);
@@ -1073,7 +1072,6 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
                         WD_TH_HM_M++;
                         debug("%s: line was deduplicated", name.c_str());
                         // Data exists more than once, evict from LL.
-                        // // info("PUTX more than once");
                         int32_t newLLHead;
                         bool evictDataLine = tagArray->evictAssociatedData(tagId, &newLLHead);
                         if (evictDataLine) {
