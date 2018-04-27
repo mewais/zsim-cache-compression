@@ -97,7 +97,7 @@ uint64_t ApproximateDedupBDICache::access(MemReq& req) {
     timing("%s: received %s req on address %lu on cycle %lu", name.c_str(), AccessTypeName(req.type), req.lineAddr, req.cycle);
 
     EventRecorder* evRec = zinfo->eventRecorders[req.srcId];
-    assert_msg(evRec, "ApproximateBDI is not connected to TimingCore");
+    assert_msg(evRec, "ApproximateDedupBDI is not connected to TimingCore");
 
     // Tie two events to an optional timing record
     // TODO: Promote to evRec if this is more generally useful

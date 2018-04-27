@@ -75,7 +75,7 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
     timing("%s: received %s req on address %lu on cycle %lu", name.c_str(), AccessTypeName(req.type), req.lineAddr, req.cycle);
 
     EventRecorder* evRec = zinfo->eventRecorders[req.srcId];
-    assert_msg(evRec, "ApproximateBDI is not connected to TimingCore");
+    assert_msg(evRec, "ApproximateDedupBDI is not connected to TimingCore");
 
     // Tie two events to an optional timing record
     // TODO: Promote to evRec if this is more generally useful
@@ -490,8 +490,9 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
                             lastEvDoneCycle = evBeginCycle;
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             while (victimListHeadId != -1) {
+                                Address wbLineAddr;
                                 if (victimListHeadId != tagId) {
-                                    Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                                    wbLineAddr = tagArray->readAddress(victimListHeadId);
                                     timing("%s: doing size/dedup eviction for address %lu on cycle %lu", name.c_str(), wbLineAddr, evBeginCycle);
                                     evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
                                     timing("%s: size/dedup eviction finished on cycle %lu", name.c_str(), evDoneCycle);
@@ -499,6 +500,7 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
                                     tagArray->postinsert(0, &req, victimListHeadId, -1, -1, NONE, -1, false);
                                 } else {
                                     newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
+                                    wbLineAddr = 0;
                                 }
                                 if (evRec->hasRecord()) {
                                     debug("%s: size/dedup eviction of %i segments from tagId %i for address %lu", name.c_str(), BDICompressionToSize(tagArray->readCompressionEncoding(victimListHeadId), zinfo->lineSize)/8, victimListHeadId, wbLineAddr);
@@ -515,7 +517,6 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
                             }
                             dataArray->postinsert(-1, &req, 0, victimDataId, victimSegmentId, NULL, false);
                         } while (freeSpace < lineSize);
-                        respCycle = lastEvDoneCycle;
                         tagArray->postinsert(req.lineAddr, &req, tagId, victimDataId, keptFromEvictions[0], encoding, -1, updateReplacement, false);
                         dataArray->postinsert(tagId, &req, 1, victimDataId, keptFromEvictions[0], data, true);
                         if (hashId == -1) {
@@ -605,8 +606,9 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
                             lastEvDoneCycle = evBeginCycle;
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             while (victimListHeadId != -1) {
+                                Address wbLineAddr;
                                 if (victimListHeadId != tagId) {
-                                    Address wbLineAddr = tagArray->readAddress(victimListHeadId);
+                                    wbLineAddr = tagArray->readAddress(victimListHeadId);
                                     timing("%s: doing size/dedup eviction for address %lu on cycle %lu", name.c_str(), wbLineAddr, evBeginCycle);
                                     evDoneCycle = cc->processEviction(req, wbLineAddr, victimListHeadId, evBeginCycle);
                                     timing("%s: size/dedup eviction finished on cycle %lu", name.c_str(), evDoneCycle);
@@ -614,6 +616,7 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
                                     tagArray->postinsert(0, &req, victimListHeadId, -1, -1, NONE, -1, false);
                                 } else {
                                     newVictimListHeadId = tagArray->readNextLL(victimListHeadId);
+                                    wbLineAddr = 0;
                                 }
                                 if (evRec->hasRecord()) {
                                     debug("%s: size/dedup eviction of %i segments from tagId %i for address %lu", name.c_str(), BDICompressionToSize(tagArray->readCompressionEncoding(victimListHeadId), zinfo->lineSize)/8, victimListHeadId, wbLineAddr);
