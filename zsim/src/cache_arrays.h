@@ -438,6 +438,19 @@ class ApproximateDedupBDIHashArray {
 };
 // Dedup BDI End
 
+class ApproximateNaiiveDedupBDIDataArray : public ApproximateDedupBDIDataArray {
+    protected:
+        g_vector<int32_t> freeList;
+
+    public:
+        ApproximateNaiiveDedupBDIDataArray(uint32_t _numLines, uint32_t _assoc, HashFamily* _hf);
+        ~ApproximateNaiiveDedupBDIDataArray();
+        int32_t preinsert(uint16_t lineSize);
+        int32_t preinsert(int32_t dataId, int32_t* tagId, g_vector<uint32_t>& exceptions);
+        // Actually inserts
+        void postinsert(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, int32_t segmentId, DataLine data, bool updateReplacement);
+};
+
 // Doppelganger BDI Begin
 class uniDoppelgangerBDITagArray {
     protected:

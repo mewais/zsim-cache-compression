@@ -46,6 +46,7 @@
 #include "approximatebdi_cache.h"
 #include "approximatededup_cache.h"
 #include "approximatededupbdi_cache.h"
+#include "approximatenaiivededupbdi_cache.h"
 #include "approximateidealdedup_cache.h"
 #include "approximateidealdedupbdi_cache.h"
 #include "dramsim_mem_ctrl.h"
@@ -120,7 +121,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
     uint32_t candidates = (arrayType == "Z")? config.get<uint32_t>(prefix + "array.candidates", 16) : ways;
 
     //Need to know number of hash functions before instantiating array
-    if (arrayType == "SetAssoc" || arrayType == "uniDoppelganger" || arrayType == "uniDoppelgangerBDI" || arrayType == "ApproximateBDI" || arrayType == "ApproximateDedup" || arrayType == "ApproximateDedupBDI") {
+    if (arrayType == "SetAssoc" || arrayType == "uniDoppelganger" || arrayType == "uniDoppelgangerBDI" || arrayType == "ApproximateBDI" || arrayType == "ApproximateDedup" || arrayType == "ApproximateDedupBDI" || arrayType == "ApproximateNaiiveDedupBDI") {
         numHashes = 1;
     } else if (arrayType == "Z") {
         numHashes = ways;
@@ -258,6 +259,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
     ApproximateDedupBDITagArray* dbtagArray = nullptr;
     ApproximateDedupBDIDataArray* dbdataArray = nullptr;
     ApproximateDedupBDIHashArray* dbhashArray = nullptr;
+    ApproximateNaiiveDedupBDIDataArray* ndbdataArray = nullptr;
     ReplPolicy* tagRP = nullptr;
     ReplPolicy* dataRP = nullptr;
     ReplPolicy* hashRP = nullptr;
@@ -287,6 +289,16 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
         tagRP = new LRUReplPolicy<true>(numLines*tagRatio);
         dbtagArray = new ApproximateDedupBDITagArray(numLines*tagRatio, ways*tagRatio, tagRP, hf);
         dbdataArray = new ApproximateDedupBDIDataArray(numLines, ways, hf);
+        uint32_t hashLines = config.get<uint32_t>(prefix + "hashLines", 64);
+        uint32_t hashAssoc = config.get<uint32_t>(prefix + "hashAssoc", 8);
+        hashRP = new DataLRUReplPolicy(hashLines);
+        size_t seed = _Fnv_hash_bytes(prefix.c_str(), prefix.size()+1, 0xB4AC5B);
+        H3HashFamily* hashCompression = new H3HashFamily(1, zinfo->hashSize, 0xCAC7EAFFA1 + seed /*make randSeed depend on prefix*/);
+        dbhashArray = new ApproximateDedupBDIHashArray(hashLines, hashAssoc, hashRP, hf, hashCompression);
+    } else if (arrayType == "ApproximateNaiiveDedupBDI") {
+        tagRP = new LRUReplPolicy<true>(numLines*tagRatio);
+        dbtagArray = new ApproximateDedupBDITagArray(numLines*tagRatio, ways*tagRatio, tagRP, hf);
+        ndbdataArray = new ApproximateNaiiveDedupBDIDataArray(numLines, ways, hf);
         uint32_t hashLines = config.get<uint32_t>(prefix + "hashLines", 64);
         uint32_t hashAssoc = config.get<uint32_t>(prefix + "hashAssoc", 8);
         hashRP = new DataLRUReplPolicy(hashLines);
@@ -477,6 +489,29 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             tagRP->setCC(cc);
 
             cache = new ApproximateDedupBDICache(numLines*tagRatio, numLines, cc, dbtagArray, dbdataArray, dbhashArray, tagRP, dataRP,
+                hashRP, accLat, invLat, mshrs, ways, timingCandidates, domain, name, crStats, evStats, tutStats, dutStats, hitStats, missStats, allStats);
+            zinfo->compressionRatioStats->push_back(crStats);
+            zinfo->evictionStats->push_back(evStats);
+            zinfo->tagUtilizationStats->push_back(tutStats);
+            zinfo->dataUtilizationStats->push_back(dutStats);
+            zinfo->tagHitStats->push_back(hitStats);
+            zinfo->tagMissStats->push_back(missStats);
+            zinfo->tagAllStats->push_back(allStats);
+            zinfo->L3Cache->push_back(cache);
+        } else if (type == "ApproximateNaiiveDedupBDI") {
+            g_string statName = name + g_string(" CompressionRatio");
+            RunningStats* crStats = new RunningStats(statName);
+            statName = name + g_string(" EvictionsPerAccess");
+            RunningStats* evStats = new RunningStats(statName);
+            statName = name + g_string(" TagArrayUtilization");
+            RunningStats* tutStats = new RunningStats(statName);
+            statName = name + g_string(" DataArrayUtilization");
+            RunningStats* dutStats = new RunningStats(statName);
+            uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
+            uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
+            tagRP->setCC(cc);
+
+            cache = new ApproximateNaiiveDedupBDICache(numLines*tagRatio, numLines, cc, dbtagArray, ndbdataArray, dbhashArray, tagRP, dataRP,
                 hashRP, accLat, invLat, mshrs, ways, timingCandidates, domain, name, crStats, evStats, tutStats, dutStats, hitStats, missStats, allStats);
             zinfo->compressionRatioStats->push_back(crStats);
             zinfo->evictionStats->push_back(evStats);

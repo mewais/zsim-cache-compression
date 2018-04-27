@@ -2007,6 +2007,98 @@ void ApproximateDedupBDIHashArray::print() {
 }
 // BDI and ApproximateBDI End
 
+ApproximateNaiiveDedupBDIDataArray::ApproximateNaiiveDedupBDIDataArray(uint32_t _numLines, uint32_t _assoc, HashFamily* _hf) : ApproximateDedupBDIDataArray(_numLines, _assoc, _hf) {
+    for (uint32_t i = 0; i < numSets; i++) {
+        freeList.push_back(i);
+    }
+}
+
+ApproximateNaiiveDedupBDIDataArray::~ApproximateNaiiveDedupBDIDataArray() {
+    for (uint32_t i = 0; i < numSets; i++) {
+        for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++) {
+            gm_free(compressedDataArray[i][j]);
+        }
+        gm_free(tagCounterArray[i]);
+        gm_free(tagPointerArray[i]);
+        gm_free(compressedDataArray[i]);
+    }
+    gm_free(tagCounterArray);
+    gm_free(tagPointerArray);
+    gm_free(compressedDataArray);
+}
+
+int32_t ApproximateNaiiveDedupBDIDataArray::preinsert(uint16_t lineSize) {
+    float leastValue = 999999;
+    int32_t leastId = 0;
+    if (freeList.size()) {
+        leastId = freeList.back();
+        freeList.pop_back();
+        return leastId;
+    }
+    for (uint32_t i = 0; i < zinfo->randomLoopTrial; i++) {
+        int32_t id = DIST->operator()(*RNG);
+        int32_t counts = 0;
+        for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++) {
+            counts += tagCounterArray[id][j];
+        }
+        if (counts == 0)
+            panic("Cannot happen");
+        if (counts <= leastValue) {
+            leastId = id;
+            leastValue = counts;
+        }
+    }
+    return leastId;
+}
+
+int32_t ApproximateNaiiveDedupBDIDataArray::preinsert(int32_t dataId, int32_t* tagId, g_vector<uint32_t>& exceptions) {
+    int32_t candidate = 0;
+    for (uint32_t j = 0; j < assoc*zinfo->lineSize/8; j++) {
+        bool Found = false;
+        for (uint32_t i = 0; i < exceptions.size(); i++)
+            if (j == exceptions[i]) {
+                Found = true;
+                break;
+            }
+        if (Found)
+            continue;
+        candidate = rp[dataId]->rank(NULL, SetAssocCands(0, (assoc*zinfo->lineSize/8)), exceptions);
+        break;
+    }
+    *tagId = tagPointerArray[dataId][candidate];
+    return candidate;
+}
+
+void ApproximateNaiiveDedupBDIDataArray::postinsert(int32_t tagId, const MemReq* req, int32_t counter, int32_t dataId, int32_t segmentId, DataLine data, bool updateReplacement) {
+    rp[dataId]->replaced(segmentId);
+
+    auto it = std::find(freeList.begin(), freeList.end(), dataId);
+    if(it != freeList.end()) {
+        auto index = std::distance(freeList.begin(), it);
+        freeList.erase(freeList.begin() + index);
+    }
+
+    tagCounterArray[dataId][segmentId] = counter;
+    if (tagPointerArray[dataId][segmentId] == -1 && tagId != -1) {
+        validLines++;
+    } else if (tagPointerArray[dataId][segmentId] != -1 && tagId == -1) {
+        validLines--;
+    }
+    tagPointerArray[dataId][segmentId] = tagId;
+    if (data)
+        PIN_SafeCopy(compressedDataArray[dataId][segmentId], data, zinfo->lineSize);
+    if (updateReplacement) rp[dataId]->update(segmentId, req);
+
+    int count = 0;
+    for (uint32_t i = 0; i < assoc*zinfo->lineSize/8; i++)
+        if (tagPointerArray[dataId][i] != -1)
+            count += BDICompressionToSize(tagArray->readCompressionEncoding(tagPointerArray[dataId][i]), zinfo->lineSize)/8;
+    if (!count)
+        freeList.push_back(dataId);
+    // info("Data was %i,%i: %i, %i", dataId, segmentId, tagCounterArray[dataId][segmentId], tagPointerArray[dataId][segmentId]);
+    // info("Data is %i,%i: %i, %i", dataId, segmentId, counter, tagId);
+}
+
 // uniDoppelganger BDI Start
 uniDoppelgangerBDITagArray::uniDoppelgangerBDITagArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf) : rp(_rp), hf(_hf), numLines(_numLines), assoc(_assoc)  {
     tagArray = gm_calloc<Address>(numLines);
