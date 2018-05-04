@@ -487,7 +487,6 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
                             keptFromEvictions.push_back(victimSegmentId);
                             uint64_t evDoneCycle = evBeginCycle;
                             TimingRecord writebackRecord;
-                            lastEvDoneCycle = evBeginCycle;
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             while (victimListHeadId != -1) {
                                 Address wbLineAddr;
@@ -603,7 +602,6 @@ uint64_t ApproximateIdealDedupBDICache::access(MemReq& req) {
                             keptFromEvictions.push_back(victimSegmentId);
                             uint64_t evDoneCycle = evBeginCycle;
                             TimingRecord writebackRecord;
-                            lastEvDoneCycle = evBeginCycle;
                             if (evRec->hasRecord()) accessRecord = evRec->popRecord();
                             while (victimListHeadId != -1) {
                                 Address wbLineAddr;
