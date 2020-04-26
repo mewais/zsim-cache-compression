@@ -1,5 +1,5 @@
 # Cache Compression zsim
-This is a variation of the original [zsim simulator](https://github.com/s5z/zsim) that supports compressed caches. I built this in collaboration with [Amin Ghasemazar](https://github.com/Amin-Azar) at UBC, under the supervision of Prof. Mieszko Lis. This work was part of my [MSc thesis](https://open.library.ubc.ca/cIRcle/collections/ubctheses/24/items/1.0368685) and an updated version of this simulator has been used in two accepted papers that are yet to appear.
+This is a variation of the original [zsim simulator](https://github.com/s5z/zsim) that supports compressed caches. I built this in collaboration with [Amin Ghasemazar](https://github.com/Amin-Azar) at UBC, under the supervision of Prof. [Mieszko Lis](http://mieszko.ece.ubc.ca/). This work was part of my [MSc thesis](https://open.library.ubc.ca/cIRcle/collections/ubctheses/24/items/1.0368685) and an updated version of this simulator has been used in two accepted papers that are yet to appear.
 
 ## Caches
 This simulator includes different types of compressed caches:
